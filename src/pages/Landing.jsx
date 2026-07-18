@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Wallet, Package, ShoppingCart, TrendingUp, ArrowRight, PlayCircle,
   Sparkles, ShieldCheck, Smartphone, LineChart
@@ -46,6 +47,7 @@ function FlowCard({ icon: Icon, label, value, sub, accent, i, floatDelay }) {
 }
 
 export default function Landing() {
+  const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -89,10 +91,10 @@ export default function Landing() {
                 and keeps your books, so you never lose an account book again.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <button className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3.5 hover:bg-blue-50">
+                <button onClick={() => navigate("/signup")} className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3.5 hover:bg-blue-50">
                   Get Started <ArrowRight size={16} />
                 </button>
-                <button className="flex items-center gap-2 border border-white/40 text-white font-semibold text-sm rounded-xl px-5 py-3.5 hover:bg-white/10">
+                <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 border border-white/40 text-white font-semibold text-sm rounded-xl px-5 py-3.5 hover:bg-white/10">
                   <PlayCircle size={17} /> Try the Tutorial
                 </button>
               </div>
@@ -145,10 +147,10 @@ export default function Landing() {
         </div>
 
         <div className="mt-10 flex items-center justify-center gap-3">
-          <button className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
+          <button onClick={() => navigate("/signup")} className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
             Create your business <ArrowRight size={16} />
           </button>
-          <button className="flex items-center gap-2 text-slate-600 font-medium text-sm rounded-xl px-5 py-3 border" style={{ borderColor: C.border }}>
+          <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 text-slate-600 font-medium text-sm rounded-xl px-5 py-3 border" style={{ borderColor: C.border }}>
             <PlayCircle size={16} /> Explore the tutorial first
           </button>
         </div>
