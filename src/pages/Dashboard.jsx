@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingCart, FileText, Users, Truck, Package,
   ShoppingBag, Receipt, BarChart3, UserCog, Settings, HelpCircle,
@@ -78,17 +79,17 @@ const recentActivity = [
 ];
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Sales", icon: TrendingUp },
-  { label: "POS", icon: ShoppingCart },
-  { label: "Invoices", icon: FileText },
-  { label: "Customers", icon: Users },
-  { label: "Suppliers", icon: Truck },
-  { label: "Inventory", icon: Package },
-  { label: "Purchases", icon: ShoppingBag },
-  { label: "Expenses", icon: Receipt },
-  { label: "Reports", icon: BarChart3 },
-  { label: "Employees", icon: UserCog },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Sales", icon: TrendingUp, path: "/pos" },
+  { label: "POS", icon: ShoppingCart, path: "/pos" },
+  { label: "Invoices", icon: FileText, path: null },
+  { label: "Customers", icon: Users, path: null },
+  { label: "Suppliers", icon: Truck, path: null },
+  { label: "Inventory", icon: Package, path: "/inventory" },
+  { label: "Purchases", icon: ShoppingBag, path: "/inventory" },
+  { label: "Expenses", icon: Receipt, path: null },
+  { label: "Reports", icon: BarChart3, path: null },
+  { label: "Employees", icon: UserCog, path: null },
 ];
 
 // ---------- graph-paper texture (ledger motif) ----------
@@ -162,6 +163,8 @@ function CustomTooltip({ active, payload, label }) {
 export default function Dashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [tab, setTab] = useState("activity");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const tabs = [
     { key: "activity", label: "Recent Activity" },
@@ -186,17 +189,31 @@ export default function Dashboard() {
           <span className="font-semibold text-[15px] text-slate-900">LedgerOS</span>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {navItems.map((item, i) => (
-            <button
-              key={item.label}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium ${
-                i === 0 ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <item.icon size={17} strokeWidth={2} />
-              {item.label}
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const isActive = item.path && location.pathname === item.path;
+            const base = "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium";
+            if (!item.path) {
+              return (
+                <div key={item.label} className={`${base} text-slate-300 cursor-not-allowed justify-between`}>
+                  <span className="flex items-center gap-3">
+                    <item.icon size={17} strokeWidth={2} />
+                    {item.label}
+                  </span>
+                  <span className="text-[9px] font-semibold tracking-wide bg-slate-50 text-slate-400 rounded-full px-1.5 py-0.5">SOON</span>
+                </div>
+              );
+            }
+            return (
+              <Link
+                key={item.label}
+                to={item.path}
+                className={`${base} ${isActive ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50"}`}
+              >
+                <item.icon size={17} strokeWidth={2} />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="px-3 py-4 border-t space-y-0.5" style={{ borderColor: C.border }}>
           <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-600 hover:bg-slate-50">
@@ -220,17 +237,33 @@ export default function Dashboard() {
               </button>
             </div>
             <nav className="space-y-0.5">
-              {navItems.map((item, i) => (
-                <button
-                  key={item.label}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium ${
-                    i === 0 ? "bg-blue-50 text-blue-600" : "text-slate-600"
-                  }`}
-                >
-                  <item.icon size={17} />
-                  {item.label}
-                </button>
-              ))}
+              {navItems.map((item) => {
+                const isActive = item.path && location.pathname === item.path;
+                if (!item.path) {
+                  return (
+                    <div key={item.label} className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-slate-300">
+                      <span className="flex items-center gap-3">
+                        <item.icon size={17} />
+                        {item.label}
+                      </span>
+                      <span className="text-[9px] font-semibold tracking-wide bg-slate-50 text-slate-400 rounded-full px-1.5 py-0.5">SOON</span>
+                    </div>
+                  );
+                }
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.path}
+                    onClick={() => setMobileNavOpen(false)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium ${
+                      isActive ? "bg-blue-50 text-blue-600" : "text-slate-600"
+                    }`}
+                  >
+                    <item.icon size={17} />
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
           </div>
         </div>
@@ -279,7 +312,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
-              <button className="flex items-center justify-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-4 py-3 hover:bg-blue-50 shrink-0">
+              <button onClick={() => navigate("/pos")} className="flex items-center justify-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-4 py-3 hover:bg-blue-50 shrink-0">
                 <Plus size={17} strokeWidth={2.5} />
                 New Sale
               </button>
@@ -414,17 +447,29 @@ export default function Dashboard() {
       {/* ---------- Bottom nav (mobile) ---------- */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t flex items-center justify-around h-16" style={{ borderColor: C.border }}>
         {[
-          { icon: LayoutDashboard, label: "Home" },
-          { icon: TrendingUp, label: "Sales" },
-          { icon: ShoppingCart, label: "POS" },
-          { icon: Package, label: "Stock" },
-          { icon: BarChart3, label: "Reports" },
-        ].map((item, i) => (
-          <button key={item.label} className="flex flex-col items-center gap-1 px-3 py-1.5">
-            <item.icon size={20} strokeWidth={2} style={{ color: i === 0 ? C.primary : C.textSub }} />
-            <span className="text-[10px] font-medium" style={{ color: i === 0 ? C.primary : C.textSub }}>{item.label}</span>
-          </button>
-        ))}
+          { icon: LayoutDashboard, label: "Home", path: "/dashboard" },
+          { icon: TrendingUp, label: "Sales", path: "/pos" },
+          { icon: ShoppingCart, label: "POS", path: "/pos" },
+          { icon: Package, label: "Stock", path: "/inventory" },
+          { icon: BarChart3, label: "Reports", path: null },
+        ].map((item) => {
+          const isActive = item.path && location.pathname === item.path;
+          const color = isActive ? C.primary : C.textSub;
+          if (!item.path) {
+            return (
+              <div key={item.label} className="flex flex-col items-center gap-1 px-3 py-1.5 opacity-40">
+                <item.icon size={20} strokeWidth={2} style={{ color: C.textSub }} />
+                <span className="text-[10px] font-medium" style={{ color: C.textSub }}>{item.label}</span>
+              </div>
+            );
+          }
+          return (
+            <Link key={item.label} to={item.path} className="flex flex-col items-center gap-1 px-3 py-1.5">
+              <item.icon size={20} strokeWidth={2} style={{ color }} />
+              <span className="text-[10px] font-medium" style={{ color }}>{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );
