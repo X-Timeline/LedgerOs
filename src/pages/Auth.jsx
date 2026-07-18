@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Building2, Store } from "lucide-react";
 
 const C = { primary: "#2563EB", primaryDark: "#1D4ED8", bg: "#F8FAFC", border: "#E2E8F0" };
@@ -6,10 +7,22 @@ const C = { primary: "#2563EB", primaryDark: "#1D4ED8", bg: "#F8FAFC", border: "
 // Simulated invite context — in the real app this is decoded server-side from the /join/:token URL
 const MOCK_INVITE = { shop: "Chase Furniture", role: "Cashier", invitedBy: "Chase Enterprise Ltd" };
 
+const modeFromPath = (pathname) => {
+  if (pathname.startsWith("/join/")) return "invite";
+  if (pathname.startsWith("/signup")) return "signup";
+  return "login";
+};
+
 export default function Auth() {
-  const [mode, setMode] = useState("login"); // login | signup | invite
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [mode, setMode] = useState(() => modeFromPath(location.pathname)); // login | signup | invite
   const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+
+  useEffect(() => {
+    setMode(modeFromPath(location.pathname));
+  }, [location.pathname]);
 
   const isInvite = mode === "invite";
   const isSignup = mode === "signup" || isInvite;
@@ -102,7 +115,7 @@ export default function Auth() {
               )}
               <div className="mt-5 pt-5 border-t text-center" style={{ borderColor: C.border }}>
                 <button
-                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                  onClick={() => navigate(mode === "login" ? "/signup" : "/login")}
                   className="text-[13px] text-slate-500"
                 >
                   {mode === "login" ? (
