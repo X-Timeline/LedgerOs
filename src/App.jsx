@@ -4,6 +4,7 @@ import Auth from "./pages/Auth.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import POS from "./pages/POS.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
+import Inventory from "./pages/Inventory.jsx";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
       <Route path="/join/:token" element={<Auth />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/pos" element={<POS />} />
+      <Route path="/inventory" element={<Inventory />} />
       <Route path="/tutorial" element={<Tutorial />} />
     </Routes>
   );
