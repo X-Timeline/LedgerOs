@@ -77,6 +77,7 @@ export default function POS() {
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState([]); // {key, productId, name, unit, price, qty, maxQty}
   const [unitPicker, setUnitPicker] = useState(null); // productId being chosen
+  const [cartOpen, setCartOpen] = useState(false); // mobile cart modal — opens when a product is added
   const [payment, setPayment] = useState("cash"); // cash | bank | credit
   const [customerOpen, setCustomerOpen] = useState(false);
   const [customer, setCustomer] = useState(null);
@@ -102,6 +103,7 @@ export default function POS() {
       ];
     });
     setUnitPicker(null);
+    setCartOpen(true); // a good was clicked to be sold — surface the cart now
   };
 
   const changeQty = (key, delta) => {
@@ -131,10 +133,11 @@ export default function POS() {
     setCart([]);
     setCustomer(null);
     setPayment("cash");
+    setCartOpen(false);
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full flex flex-col lg:flex-row" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       {/* ---------- Product picker ---------- */}
       <div className="flex-1 min-w-0 p-4 lg:p-6 pb-40 lg:pb-6">
         <div className="flex items-center justify-between mb-4">
@@ -223,8 +226,8 @@ export default function POS() {
         )}
       </div>
 
-      {/* ---------- Cart panel ---------- */}
-      <div className="lg:w-96 shrink-0 bg-white border-t lg:border-t-0 lg:border-l flex flex-col fixed bottom-0 left-0 right-0 lg:static max-h-[65vh] lg:max-h-none rounded-t-3xl lg:rounded-none" style={{ borderColor: C.border, boxShadow: "0 -4px 24px rgba(15,23,42,0.06)" }}>
+      {/* ---------- Cart: desktop persistent side panel ---------- */}
+      <div className="hidden lg:flex lg:w-96 shrink-0 bg-white border-l flex-col" style={{ borderColor: C.border }}>
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: C.border }}>
           <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
             <ShoppingCart size={16} /> Cart
@@ -263,7 +266,6 @@ export default function POS() {
         </div>
 
         <div className="px-5 py-4 border-t space-y-4" style={{ borderColor: C.border }}>
-          {/* Payment method */}
           <div>
             <p className="text-[11px] font-medium text-slate-500 mb-2">Payment method</p>
             <div className="grid grid-cols-3 gap-2">
@@ -287,7 +289,6 @@ export default function POS() {
             </div>
           </div>
 
-          {/* Credit customer picker */}
           {payment === "credit" && (
             <div className="relative">
               <button
@@ -333,6 +334,140 @@ export default function POS() {
           </button>
         </div>
       </div>
+
+      {/* ---------- Cart: mobile modal — only opens when a good is added ---------- */}
+      {cartOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end">
+          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setCartOpen(false)} />
+          <div className="relative w-full bg-white rounded-t-3xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: C.border }}>
+              <button
+                onClick={() => setCartOpen(false)}
+                aria-label="Cancel"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
+                style={{ backgroundColor: C.danger }}
+              >
+                <X size={16} />
+              </button>
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <ShoppingCart size={16} /> Cart · {cart.length} item{cart.length === 1 ? "" : "s"}
+              </span>
+              <span className="w-8" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+              {cart.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-2xl mb-1">🛒</p>
+                  <p className="text-xs text-slate-400">No items yet. Tap a product to add it.</p>
+                </div>
+              ) : (
+                cart.map((i) => (
+                  <div key={i.key} className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-slate-900 truncate">{i.name}</p>
+                      <p className="text-[11px] text-slate-400 capitalize">{i.unit} · {money(i.price)} each</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 border rounded-lg" style={{ borderColor: C.border }}>
+                      <button onClick={() => changeQty(i.key, -1)} className="p-1.5 hover:bg-slate-50 rounded-l-lg">
+                        <Minus size={12} />
+                      </button>
+                      <span className="text-xs font-medium w-5 text-center tabular-nums">{i.qty}</span>
+                      <button onClick={() => changeQty(i.key, 1)} disabled={i.qty >= i.maxQty} className="p-1.5 hover:bg-slate-50 rounded-r-lg disabled:opacity-30">
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                    <button onClick={() => removeItem(i.key)} className="p-1.5 text-slate-300 hover:text-red-500">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t space-y-4" style={{ borderColor: C.border }}>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 mb-2">Payment method</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: "cash", label: "Cash", icon: Banknote },
+                    { key: "bank", label: "Transfer", icon: Landmark },
+                    { key: "credit", label: "Credit", icon: Clock },
+                  ].map((m) => (
+                    <button
+                      key={m.key}
+                      onClick={() => setPayment(m.key)}
+                      className={`flex flex-col items-center gap-1 rounded-xl border py-2.5 text-[11px] font-medium ${
+                        payment === m.key ? "border-blue-500 bg-blue-50 text-blue-600" : "text-slate-500"
+                      }`}
+                      style={{ borderColor: payment === m.key ? C.primary : C.border }}
+                    >
+                      <m.icon size={15} />
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {payment === "credit" && (
+                <div className="relative">
+                  <button
+                    onClick={() => setCustomerOpen((v) => !v)}
+                    className="w-full flex items-center justify-between rounded-xl border px-3 py-2.5 text-[13px]"
+                    style={{ borderColor: C.border }}
+                  >
+                    <span className={customer ? "text-slate-900 font-medium" : "text-slate-400"}>
+                      {customer ? customer.name : "Select customer"}
+                    </span>
+                    <ChevronDown size={15} className="text-slate-400" />
+                  </button>
+                  {customerOpen && (
+                    <div className="absolute bottom-full mb-1 w-full bg-white border rounded-xl shadow-lg overflow-hidden z-10" style={{ borderColor: C.border }}>
+                      {customers.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => { setCustomer(c); setCustomerOpen(false); }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 text-[13px] hover:bg-slate-50"
+                        >
+                          <span>{c.name}</span>
+                          {customer?.id === c.id && <Check size={14} style={{ color: C.primary }} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-amber-600 mt-1.5">Stock leaves now; sale stays pending until paid.</p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Total</span>
+                <span className="text-xl font-semibold tabular-nums text-slate-900">{money(total)}</span>
+              </div>
+
+              <button
+                onClick={postSale}
+                disabled={!canPost}
+                className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
+                style={{ backgroundColor: C.primary }}
+              >
+                Complete Sale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Floating reopen affordance (mobile, cart has items but modal closed) ---------- */}
+      {!cartOpen && cart.length > 0 && (
+        <button
+          onClick={() => setCartOpen(true)}
+          className="lg:hidden fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full pl-4 pr-5 py-3 text-white text-sm font-semibold shadow-lg"
+          style={{ backgroundColor: C.primary }}
+        >
+          <ShoppingCart size={16} />
+          {cart.length} · {money(total)}
+        </button>
+      )}
 
       {/* ---------- Success confirmation ---------- */}
       {posted && (

@@ -38,7 +38,7 @@ export default function Reports() {
   const reconciled = balanceSheet.openingCapital + netProfit;
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <h1 className="text-lg font-semibold text-slate-900">Reports</h1>
         <p className="text-xs text-slate-400 mb-4">Chase Furniture · Year to date</p>

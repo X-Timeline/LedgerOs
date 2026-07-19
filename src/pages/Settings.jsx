@@ -28,7 +28,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <h1 className="text-lg font-semibold text-slate-900 mb-1">Settings</h1>
         <p className="text-xs text-slate-400 mb-5">Manage your business and shops</p>

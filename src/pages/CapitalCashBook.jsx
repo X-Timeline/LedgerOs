@@ -74,7 +74,7 @@ export default function CapitalCashBook() {
   const filtered = filter === "all" ? entries : entries.filter((e) => e.type === filter);
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <h1 className="text-lg font-semibold text-slate-900">Capital & Cash Book</h1>
         <p className="text-xs text-slate-400 mb-4">Chase Furniture</p>
