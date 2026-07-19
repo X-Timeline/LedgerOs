@@ -83,12 +83,13 @@ const navItems = [
   { label: "Sales", icon: TrendingUp, path: "/pos" },
   { label: "POS", icon: ShoppingCart, path: "/pos" },
   { label: "Invoices", icon: FileText, path: null },
-  { label: "Customers", icon: Users, path: null },
-  { label: "Suppliers", icon: Truck, path: null },
+  { label: "Customers", icon: Users, path: "/customers" },
+  { label: "Suppliers", icon: Truck, path: "/suppliers" },
   { label: "Inventory", icon: Package, path: "/inventory" },
   { label: "Purchases", icon: ShoppingBag, path: "/inventory" },
+  { label: "Capital & Cash Book", icon: Wallet, path: "/capital" },
   { label: "Expenses", icon: Receipt, path: null },
-  { label: "Reports", icon: BarChart3, path: null },
+  { label: "Reports", icon: BarChart3, path: "/reports" },
   { label: "Employees", icon: UserCog, path: null },
 ];
 
@@ -451,7 +452,7 @@ export default function Dashboard() {
           { icon: TrendingUp, label: "Sales", path: "/pos" },
           { icon: ShoppingCart, label: "POS", path: "/pos" },
           { icon: Package, label: "Stock", path: "/inventory" },
-          { icon: BarChart3, label: "Reports", path: null },
+          { icon: BarChart3, label: "Reports", path: "/reports" },
         ].map((item) => {
           const isActive = item.path && location.pathname === item.path;
           const color = isActive ? C.primary : C.textSub;
