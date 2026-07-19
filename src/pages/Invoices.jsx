@@ -35,7 +35,7 @@ export default function Invoices() {
   const markPaid = (id) => setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status: "paid" } : i)));
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <div className="flex items-center justify-between mb-5">
           <div>
