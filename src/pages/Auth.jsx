@@ -98,6 +98,7 @@ export default function Auth() {
             </div>
 
             <button
+              onClick={() => navigate(mode === "signup" ? "/onboarding" : "/dashboard")}
               className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white mt-2"
               style={{ backgroundColor: C.primary }}
             >

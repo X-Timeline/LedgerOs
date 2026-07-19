@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, FileText, Users, Truck, Package,
   ShoppingBag, Receipt, BarChart3, UserCog, Settings, HelpCircle,
   Search, Bell, Plus, TrendingUp, TrendingDown, Wallet, Landmark,
-  Boxes, AlertTriangle, ArrowUpRight, ArrowDownRight, Menu, X, ChevronRight
+  Boxes, AlertTriangle, ArrowUpRight, ArrowDownRight, Menu, X, ChevronRight, ChevronDown, Store, Layers
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -28,6 +28,15 @@ const C = {
 
 const naira = (n) =>
   "₦" + Math.round(n).toLocaleString("en-NG");
+
+// Shops under this business. `factor` is a display-only illustration for this mock —
+// in the real app, each shop's numbers come from its own independent API query,
+// not a multiplier on shared totals.
+const shops = [
+  { id: "all", name: "All Shops", factor: 1 },
+  { id: "furniture", name: "Chase Furniture", factor: 0.62 },
+  { id: "gadget", name: "Chase Gadget", factor: 0.38 },
+];
 
 // ---------- mock data ----------
 const revenueData = [
@@ -82,15 +91,15 @@ const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Sales", icon: TrendingUp, path: "/pos" },
   { label: "POS", icon: ShoppingCart, path: "/pos" },
-  { label: "Invoices", icon: FileText, path: null },
+  { label: "Invoices", icon: FileText, path: "/invoices" },
   { label: "Customers", icon: Users, path: "/customers" },
   { label: "Suppliers", icon: Truck, path: "/suppliers" },
   { label: "Inventory", icon: Package, path: "/inventory" },
   { label: "Purchases", icon: ShoppingBag, path: "/inventory" },
   { label: "Capital & Cash Book", icon: Wallet, path: "/capital" },
-  { label: "Expenses", icon: Receipt, path: null },
+  { label: "Expenses", icon: Receipt, path: "/expenses" },
   { label: "Reports", icon: BarChart3, path: "/reports" },
-  { label: "Employees", icon: UserCog, path: null },
+  { label: "Team", icon: UserCog, path: "/team" },
 ];
 
 // ---------- graph-paper texture (ledger motif) ----------
@@ -166,6 +175,8 @@ export default function Dashboard() {
   const [tab, setTab] = useState("activity");
   const location = useLocation();
   const navigate = useNavigate();
+  const [selectedShop, setSelectedShop] = useState(shops[0]);
+  const [shopMenuOpen, setShopMenuOpen] = useState(false);
 
   const tabs = [
     { key: "activity", label: "Recent Activity" },
@@ -188,6 +199,34 @@ export default function Dashboard() {
             <span className="text-white text-xs font-bold">L</span>
           </div>
           <span className="font-semibold text-[15px] text-slate-900">LedgerOS</span>
+        </div>
+
+        <div className="relative px-3 pt-3">
+          <button
+            onClick={() => setShopMenuOpen((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left"
+            style={{ borderColor: C.border }}
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              {selectedShop.id === "all" ? <Layers size={14} className="text-blue-500 shrink-0" /> : <Store size={14} className="text-blue-500 shrink-0" />}
+              <span className="text-[13px] font-semibold text-slate-900 truncate">{selectedShop.name}</span>
+            </span>
+            <ChevronDown size={14} className="text-slate-400 shrink-0" />
+          </button>
+          {shopMenuOpen && (
+            <div className="absolute left-3 right-3 mt-1 bg-white border rounded-xl shadow-lg overflow-hidden z-20" style={{ borderColor: C.border }}>
+              {shops.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => { setSelectedShop(s); setShopMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-[13px] ${s.id === selectedShop.id ? "bg-blue-50 text-blue-600 font-medium" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  {s.id === "all" ? <Layers size={13} /> : <Store size={13} />}
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
@@ -217,10 +256,10 @@ export default function Dashboard() {
           })}
         </nav>
         <div className="px-3 py-4 border-t space-y-0.5" style={{ borderColor: C.border }}>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-600 hover:bg-slate-50">
+          <Link to="/settings" className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-600 hover:bg-slate-50">
             <Settings size={17} /> Settings
-          </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-600 hover:bg-slate-50">
+          </Link>
+          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-300 cursor-not-allowed">
             <HelpCircle size={17} /> Help
           </button>
         </div>
@@ -237,6 +276,14 @@ export default function Dashboard() {
                 <X size={18} />
               </button>
             </div>
+            <select
+              value={selectedShop.id}
+              onChange={(e) => setSelectedShop(shops.find((s) => s.id === e.target.value))}
+              className="w-full rounded-xl border px-3 py-2.5 text-[13px] font-medium text-slate-900 outline-none mb-4 bg-white"
+              style={{ borderColor: C.border }}
+            >
+              {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
             <nav className="space-y-0.5">
               {navItems.map((item) => {
                 const isActive = item.path && location.pathname === item.path;
@@ -295,9 +342,11 @@ export default function Dashboard() {
             <GraphPaper className="absolute inset-0 pointer-events-none" />
             <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
               <div>
-                <p className="text-blue-100 text-[13px] font-medium">Good morning, Chidi — here's today</p>
+                <p className="text-blue-100 text-[13px] font-medium">
+                  Good morning, Chidi — here's {selectedShop.id === "all" ? "the business" : selectedShop.name} today
+                </p>
                 <p className="mt-1 text-white text-3xl lg:text-4xl font-semibold tabular-nums tracking-tight">
-                  {naira(204000)}
+                  {naira(204000 * selectedShop.factor)}
                   <span className="text-blue-200 text-base font-medium ml-2">sold so far</span>
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -308,7 +357,7 @@ export default function Dashboard() {
                   ].map((c) => (
                     <div key={c.l} className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/15">
                       <span className="text-blue-100 text-[11px] block leading-tight">{c.l}</span>
-                      <span className="text-white text-sm font-semibold tabular-nums">{naira(c.v)}</span>
+                      <span className="text-white text-sm font-semibold tabular-nums">{naira(c.v * selectedShop.factor)}</span>
                     </div>
                   ))}
                 </div>
@@ -323,7 +372,7 @@ export default function Dashboard() {
           {/* Stat grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {stats.map((s, i) => (
-              <StatCard key={s.label} {...s} i={i} />
+              <StatCard key={s.label} {...s} value={s.value * selectedShop.factor} i={i} />
             ))}
           </div>
 
