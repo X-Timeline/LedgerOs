@@ -172,7 +172,7 @@ export default function Dashboard() {
                   Good morning, Chidi — here's {selectedShop.id === "all" ? "the business" : selectedShop.name} today
                 </p>
                 <p className="mt-1 text-white text-3xl lg:text-4xl font-semibold tabular-nums tracking-tight">
-                  {naira(204000 * selectedShop.factor)}
+                  {naira(204000)}
                   <span className="text-blue-200 text-base font-medium ml-2">sold so far</span>
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -183,7 +183,7 @@ export default function Dashboard() {
                   ].map((c) => (
                     <div key={c.l} className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/15">
                       <span className="text-blue-100 text-[11px] block leading-tight">{c.l}</span>
-                      <span className="text-white text-sm font-semibold tabular-nums">{naira(c.v * selectedShop.factor)}</span>
+                      <span className="text-white text-sm font-semibold tabular-nums">{naira(c.v)}</span>
                     </div>
                   ))}
                 </div>
@@ -198,7 +198,7 @@ export default function Dashboard() {
           {/* Stat grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {stats.map((s, i) => (
-              <StatCard key={s.label} {...s} value={s.value * selectedShop.factor} i={i} />
+              <StatCard key={s.label} {...s} value={s.value} i={i} />
             ))}
           </div>
 

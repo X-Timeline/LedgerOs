@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingCart, FileText, Users, Truck, Package,
   ShoppingBag, Receipt, BarChart3, UserCog, Settings, HelpCircle,
-  Search, Bell, Menu, X, ChevronDown, Store, Layers, TrendingUp, Wallet
+  Search, Bell, Menu, X, ChevronDown, Store, Layers, TrendingUp, Wallet, LogOut
 } from "lucide-react";
+import { supabase } from "../lib/supabaseClient.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const C = {
   primary: "#2563EB",
@@ -14,13 +16,7 @@ const C = {
   textSub: "#64748B",
 };
 
-// Shops under this business. `factor` is a display-only illustration for the mock —
-// in the real app, each shop's numbers come from its own independent API query.
-export const shops = [
-  { id: "all", name: "All Shops", factor: 1 },
-  { id: "furniture", name: "Chase Furniture", factor: 0.62 },
-  { id: "gadget", name: "Chase Gadget", factor: 0.38 },
-];
+const ALL_SHOPS = { id: "all", name: "All Shops" };
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -39,9 +35,25 @@ const navItems = [
 
 export default function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [selectedShop, setSelectedShop] = useState(shops[0]);
+  const [shops, setShops] = useState([ALL_SHOPS]);
+  const [selectedShop, setSelectedShop] = useState(ALL_SHOPS);
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    // RLS (has_shop_access) already limits this to shops the logged-in user
+    // can see — no need to filter by user id here.
+    supabase
+      .from("shops")
+      .select("id, name")
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        setShops([ALL_SHOPS, ...data]);
+      });
+  }, [user]);
 
   return (
     <div className="min-h-screen w-full flex" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
@@ -118,8 +130,11 @@ export default function AppShell() {
           <Link to="/settings" className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-600 hover:bg-slate-50">
             <Settings size={17} /> Settings
           </Link>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-300 cursor-not-allowed">
-            <HelpCircle size={17} /> Help
+          <button
+            onClick={signOut}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <LogOut size={17} /> Sign Out
           </button>
         </div>
       </aside>
