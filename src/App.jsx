@@ -1,4 +1,6 @@
 import { Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Landing from "./pages/Landing.jsx";
 import Auth from "./pages/Auth.jsx";
 import Onboarding from "./pages/Onboarding.jsx";
@@ -18,29 +20,43 @@ import Settings from "./pages/Settings.jsx";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<Auth />} />
-      <Route path="/signup" element={<Auth />} />
-      <Route path="/join/:token" element={<Auth />} />
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/tutorial" element={<Tutorial />} />
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Auth />} />
+        <Route path="/signup" element={<Auth />} />
+        <Route path="/join/:token" element={<Auth />} />
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <Onboarding />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/tutorial" element={<Tutorial />} />
 
-      {/* Every route below shares one persistent shell: sidebar/topbar on
-          desktop, drawer + bottom nav on mobile, shop switcher included. */}
-      <Route element={<AppShell />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/pos" element={<POS />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/capital" element={<CapitalCashBook />} />
-        <Route path="/customers" element={<Customers />} />
-        <Route path="/suppliers" element={<Suppliers />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/expenses" element={<Expenses />} />
-        <Route path="/invoices" element={<Invoices />} />
-        <Route path="/team" element={<Team />} />
-        <Route path="/settings" element={<Settings />} />
-      </Route>
-    </Routes>
+        {/* Every route below shares one persistent shell and requires login. */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/pos" element={<POS />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/capital" element={<CapitalCashBook />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/suppliers" element={<Suppliers />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/expenses" element={<Expenses />} />
+          <Route path="/invoices" element={<Invoices />} />
+          <Route path="/team" element={<Team />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+      </Routes>
+    </AuthProvider>
   );
 }

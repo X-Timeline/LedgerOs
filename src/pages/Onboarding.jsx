@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, Store, ArrowRight, Check } from "lucide-react";
+import { Building2, Store, ArrowRight, Check, AlertCircle } from "lucide-react";
+import { supabase } from "../lib/supabaseClient.js";
 
-const C = { primary: "#2563EB", primaryDark: "#1D4ED8", success: "#22C55E", bg: "#F8FAFC", border: "#E2E8F0" };
+const C = { primary: "#2563EB", primaryDark: "#1D4ED8", success: "#22C55E", danger: "#EF4444", bg: "#F8FAFC", border: "#E2E8F0" };
 const currencies = ["NGN — Nigerian Naira (₦)", "GHS — Ghanaian Cedi (₵)", "KES — Kenyan Shilling (KSh)", "USD — US Dollar ($)"];
 
 export default function Onboarding() {
@@ -10,11 +11,49 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [business, setBusiness] = useState({ name: "", currency: currencies[0] });
   const [shop, setShop] = useState({ name: "", capital: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const steps = [
     { n: 1, label: "Business" },
     { n: 2, label: "First Shop" },
   ];
+
+  const finish = async () => {
+    if (!shop.name) return;
+    setError("");
+    setLoading(true);
+
+    const { data, error: rpcError } = await supabase
+      .rpc("create_business_with_shop", { p_business_name: business.name, p_shop_name: shop.name })
+      .single();
+
+    if (rpcError) {
+      setLoading(false);
+      return setError(rpcError.message);
+    }
+
+    // The RPC doesn't take a currency argument — set it as a follow-up update.
+    const currencyCode = business.currency.slice(0, 3);
+    await supabase.from("businesses").update({ currency: currencyCode }).eq("id", data.business_id);
+
+    if (shop.capital) {
+      const { error: capitalError } = await supabase.from("capital_entries").insert({
+        shop_id: data.shop_id,
+        direction: "IN",
+        amount: Number(shop.capital),
+        channel: "CASH",
+        note: "Opening capital",
+      });
+      if (capitalError) {
+        setLoading(false);
+        return setError(capitalError.message);
+      }
+    }
+
+    setLoading(false);
+    navigate("/dashboard");
+  };
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center px-4 py-10" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
@@ -45,6 +84,12 @@ export default function Onboarding() {
         </div>
 
         <div className="rounded-3xl bg-white border p-6" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.05)" }}>
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mb-4">
+              <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+            </div>
+          )}
           {step === 1 && (
             <>
               <span className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${C.primary}12` }}>
@@ -114,12 +159,12 @@ export default function Onboarding() {
                   Back
                 </button>
                 <button
-                  onClick={() => shop.name && navigate("/dashboard")}
-                  disabled={!shop.name}
+                  onClick={finish}
+                  disabled={!shop.name || loading}
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
                   style={{ backgroundColor: C.primary }}
                 >
-                  Go to Dashboard <ArrowRight size={15} />
+                  {loading ? "Creating…" : <>Go to Dashboard <ArrowRight size={15} /></>}
                 </button>
               </div>
             </>
