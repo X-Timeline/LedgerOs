@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   Package, Plus, ChevronDown, ChevronRight, AlertTriangle, Boxes,
-  Banknote, Landmark, X, Layers
+  Banknote, Landmark, X, Layers, AlertCircle
 } from "lucide-react";
+import { api } from "../lib/api.js";
 
 const C = {
   primary: "#2563EB",
@@ -15,69 +17,71 @@ const C = {
 
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
 
-const initialProducts = [
-  {
-    id: "p1", name: "Golden Morn", baseUnit: "carton", costingMethod: "FIFO",
-    sellUnits: [{ name: "carton", factor: 1 }, { name: "packet", factor: 20 }],
-    lots: [
-      { id: "l1", qty: 3, remaining: 1, cost: 9000, date: "2026-06-02", channel: "cash" },
-      { id: "l2", qty: 5, remaining: 5, cost: 15500, date: "2026-07-10", channel: "bank" },
-    ],
-  },
-  {
-    id: "p2", name: "Peak Milk 400g", baseUnit: "carton", costingMethod: "WEIGHTED_AVG",
-    sellUnits: [{ name: "carton", factor: 1 }, { name: "tin", factor: 24 }],
-    lots: [{ id: "l3", qty: 6, remaining: 4, cost: 33000, date: "2026-07-05", channel: "cash" }],
-  },
-  {
-    id: "p3", name: "Indomie Super Pack", baseUnit: "carton", costingMethod: "FIFO",
-    sellUnits: [{ name: "carton", factor: 1 }, { name: "pack", factor: 40 }],
-    lots: [{ id: "l4", qty: 4, remaining: 3, cost: 24800, date: "2026-07-14", channel: "bank" }],
-  },
-];
-
 function stockOf(product) {
-  return product.lots.reduce((s, l) => s + l.remaining, 0);
+  return (product.purchase_lots || []).reduce((s, l) => s + Number(l.remaining_quantity), 0);
 }
 function valueOf(product) {
-  return product.lots.reduce((s, l) => s + (l.remaining / l.qty) * l.cost, 0);
+  return (product.purchase_lots || []).reduce(
+    (s, l) => s + (Number(l.remaining_quantity) / Number(l.quantity || 1)) * Number(l.total_cost),
+    0
+  );
 }
 
 export default function Inventory() {
-  const [products, setProducts] = useState(initialProducts);
+  const { selectedShop } = useOutletContext();
+  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [tab, setTab] = useState("stock");
   const [expanded, setExpanded] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const [purchase, setPurchase] = useState({ productId: "", qty: "", cost: "", channel: "cash" });
   const [newProduct, setNewProduct] = useState({
     name: "", baseUnit: "carton", costingMethod: "FIFO",
-    sellUnits: [{ name: "carton", factor: 1 }],
+    sellUnits: [{ name: "", factor: "" }],
   });
 
-  const addLot = () => {
+  const refresh = useCallback(() => {
+    if (!shopId) return;
+    setLoading(true);
+    api
+      .get(`/products?shopId=${shopId}`)
+      .then((data) => {
+        setLoading(false);
+        setProducts(data || []);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(err.message);
+      });
+  }, [shopId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const addLot = async () => {
     if (!purchase.productId || !purchase.qty || !purchase.cost) return;
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === purchase.productId
-          ? {
-              ...p,
-              lots: [
-                ...p.lots,
-                {
-                  id: "l" + Date.now(),
-                  qty: Number(purchase.qty),
-                  remaining: Number(purchase.qty),
-                  cost: Number(purchase.cost),
-                  date: new Date().toISOString().slice(0, 10),
-                  channel: purchase.channel,
-                },
-              ],
-            }
-          : p
-      )
-    );
-    setPurchase({ productId: "", qty: "", cost: "", channel: "cash" });
-    setTab("stock");
+    setSaving(true);
+    setError("");
+    try {
+      await api.post("/purchase-lots", {
+        shopId,
+        productId: purchase.productId,
+        quantity: Number(purchase.qty),
+        totalCost: Number(purchase.cost),
+        channel: purchase.channel.toUpperCase(),
+        purchaseDate: new Date().toISOString(),
+      });
+      setSaving(false);
+      setPurchase({ productId: "", qty: "", cost: "", channel: "cash" });
+      setTab("stock");
+      refresh();
+    } catch (err) {
+      setSaving(false);
+      setError(err.message);
+    }
   };
 
   const addSellUnit = () =>
@@ -92,23 +96,55 @@ export default function Inventory() {
   const removeSellUnit = (i) =>
     setNewProduct((p) => ({ ...p, sellUnits: p.sellUnits.filter((_, idx) => idx !== i) }));
 
-  const createProduct = () => {
+  const createProduct = async () => {
     if (!newProduct.name) return;
-    setProducts((prev) => [
-      ...prev,
-      { ...newProduct, id: "p" + Date.now(), lots: [] },
-    ]);
-    setNewProduct({ name: "", baseUnit: "carton", costingMethod: "FIFO", sellUnits: [{ name: "carton", factor: 1 }] });
-    setTab("stock");
+    setSaving(true);
+    setError("");
+
+    const validUnits = newProduct.sellUnits.filter((u) => u.name && u.factor);
+
+    try {
+      await api.post("/products", {
+        shopId,
+        name: newProduct.name,
+        baseUnit: newProduct.baseUnit || "unit",
+        costingMethod: newProduct.costingMethod,
+        sellUnits: validUnits.map((u) => ({ name: u.name, conversionToBase: Number(u.factor) })),
+      });
+      setSaving(false);
+      setNewProduct({ name: "", baseUnit: "carton", costingMethod: "FIFO", sellUnits: [{ name: "", factor: "" }] });
+      setTab("stock");
+      refresh();
+    } catch (err) {
+      setSaving(false);
+      setError(err.message);
+    }
   };
+
+  if (!shopId) {
+    return (
+      <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+        <p className="text-sm text-slate-400 text-center max-w-xs">
+          Select a specific shop from the switcher above to manage its inventory — "All Shops" doesn't apply here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <div className="mb-1">
           <h1 className="text-lg font-semibold text-slate-900">Inventory</h1>
-          <p className="text-xs text-slate-400">Chase Furniture</p>
+          <p className="text-xs text-slate-400">{selectedShop.name}</p>
         </div>
+
+        {error && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mt-4">
+            <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+          </div>
+        )}
 
         <div className="flex gap-1 my-5 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
           {[
@@ -131,6 +167,10 @@ export default function Inventory() {
         {/* ---------- Stock list ---------- */}
         {tab === "stock" && (
           <div className="space-y-3">
+            {loading && <p className="text-xs text-slate-400 text-center py-10">Loading…</p>}
+            {!loading && products.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-10">No products yet — add your first one.</p>
+            )}
             {products.map((p) => {
               const stock = stockOf(p);
               const low = stock <= 5;
@@ -147,13 +187,13 @@ export default function Inventory() {
                       </span>
                       <div className="text-left">
                         <p className="text-[13.5px] font-semibold text-slate-900">{p.name}</p>
-                        <p className="text-[11px] text-slate-400">{p.costingMethod.replace("_", " ")} · {p.lots.length} lot{p.lots.length === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] text-slate-400">{p.costing_method.replace("_", " ")} · {(p.purchase_lots || []).length} lot{(p.purchase_lots || []).length === 1 ? "" : "s"}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className={`text-[13px] font-semibold tabular-nums ${low ? "text-amber-600" : "text-slate-900"}`}>
-                          {stock} {p.baseUnit}{stock === 1 ? "" : "s"}
+                          {stock} {p.base_unit}{stock === 1 ? "" : "s"}
                         </p>
                         <p className="text-[11px] text-slate-400">{naira(valueOf(p))} value</p>
                       </div>
@@ -168,19 +208,25 @@ export default function Inventory() {
                           <AlertTriangle size={12} /> Running low
                         </div>
                       )}
-                      {p.lots.map((l) => (
-                        <div key={l.id} className="flex items-center justify-between text-[12px]">
-                          <span className="flex items-center gap-1.5 text-slate-500">
-                            <Layers size={12} /> {l.date} · {l.remaining}/{l.qty} left
-                            {l.channel === "cash" ? <Banknote size={11} className="text-slate-300" /> : <Landmark size={11} className="text-slate-300" />}
-                          </span>
-                          <span className="font-medium tabular-nums text-slate-700">{naira(l.cost)}</span>
-                        </div>
-                      ))}
+                      {(p.purchase_lots || [])
+                        .slice()
+                        .sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date))
+                        .map((l) => (
+                          <div key={l.id} className="flex items-center justify-between text-[12px]">
+                            <span className="flex items-center gap-1.5 text-slate-500">
+                              <Layers size={12} /> {new Date(l.purchase_date).toISOString().slice(0, 10)} · {l.remaining_quantity}/{l.quantity} left
+                              {l.channel === "CASH" ? <Banknote size={11} className="text-slate-300" /> : <Landmark size={11} className="text-slate-300" />}
+                            </span>
+                            <span className="font-medium tabular-nums text-slate-700">{naira(l.total_cost)}</span>
+                          </div>
+                        ))}
+                      {(p.purchase_lots || []).length === 0 && (
+                        <p className="text-[11px] text-slate-400">No stock purchased yet for this product.</p>
+                      )}
                       <div className="pt-2 flex flex-wrap gap-1.5">
-                        {p.sellUnits.map((u) => (
-                          <span key={u.name} className="text-[10px] font-medium text-slate-500 bg-slate-50 border rounded-full px-2 py-0.5" style={{ borderColor: C.border }}>
-                            1 {p.baseUnit} = {u.factor} {u.name}
+                        {(p.product_units || []).map((u) => (
+                          <span key={u.id} className="text-[10px] font-medium text-slate-500 bg-slate-50 border rounded-full px-2 py-0.5" style={{ borderColor: C.border }}>
+                            1 {p.base_unit} = {u.conversion_to_base} {u.unit_name}
                           </span>
                         ))}
                       </div>
@@ -207,7 +253,7 @@ export default function Inventory() {
                 >
                   <option value="">Select product…</option>
                   {products.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.baseUnit})</option>
+                    <option key={p.id} value={p.id}>{p.name} ({p.base_unit})</option>
                   ))}
                 </select>
               </div>
@@ -257,10 +303,11 @@ export default function Inventory() {
               </div>
               <button
                 onClick={addLot}
-                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1"
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1 disabled:opacity-50"
                 style={{ backgroundColor: C.primary }}
               >
-                <Plus size={15} /> Add to Stock
+                <Plus size={15} /> {saving ? "Saving…" : "Add to Stock"}
               </button>
             </div>
           </div>
@@ -309,7 +356,7 @@ export default function Inventory() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[11px] font-medium text-slate-500">Sell units</label>
+                  <label className="text-[11px] font-medium text-slate-500">Sell units (optional — beyond the purchase unit)</label>
                   <button onClick={addSellUnit} className="text-[11px] font-medium text-blue-600 flex items-center gap-1">
                     <Plus size={11} /> Add unit
                   </button>
@@ -345,10 +392,11 @@ export default function Inventory() {
 
               <button
                 onClick={createProduct}
-                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1"
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1 disabled:opacity-50"
                 style={{ backgroundColor: C.primary }}
               >
-                <Boxes size={15} /> Create Product
+                <Boxes size={15} /> {saving ? "Saving…" : "Create Product"}
               </button>
             </div>
           </div>

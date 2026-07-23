@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Plus, Check, Clock, AlertCircle, X } from "lucide-react";
+import { FileText, Plus, Check, Clock, AlertCircle, X, Info } from "lucide-react";
 
 const C = { primary: "#2563EB", success: "#22C55E", warning: "#F59E0B", danger: "#EF4444", bg: "#F8FAFC", border: "#E2E8F0" };
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
@@ -45,6 +45,13 @@ export default function Invoices() {
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-xl px-3.5 py-2" style={{ backgroundColor: C.primary }}>
             <Plus size={14} /> New Invoice
           </button>
+        </div>
+
+        <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5 mb-4">
+          <Info size={14} className="text-blue-500 mt-0.5 shrink-0" />
+          <p className="text-[12px] text-blue-700 leading-relaxed">
+            Sample data — there's no invoices table in the backend yet, so nothing entered here is saved. Needs a schema addition before this is real.
+          </p>
         </div>
 
         <div className="flex gap-1.5 mb-4 flex-wrap">

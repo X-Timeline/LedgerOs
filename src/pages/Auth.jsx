@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Building2, Store, AlertCircle, MailCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { supabase } from "../lib/supabaseClient.js";
+import { api } from "../lib/api.js";
 
 const C = { primary: "#2563EB", primaryDark: "#1D4ED8", bg: "#F8FAFC", border: "#E2E8F0", danger: "#EF4444" };
 
@@ -66,9 +66,13 @@ export default function Auth() {
     }
 
     if (isInvite) {
-      const { error: joinError } = await supabase.rpc("join_shop_with_code", { p_shop_code: token });
+      try {
+        await api.post("/shops/join", { shopCode: token });
+      } catch (err) {
+        setLoading(false);
+        return setError(err.message);
+      }
       setLoading(false);
-      if (joinError) return setError(joinError.message);
       navigate("/dashboard");
       return;
     }
