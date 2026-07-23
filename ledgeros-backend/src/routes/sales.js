@@ -43,7 +43,7 @@ router.get('/', requireAuth, async (req, res) => {
   const db = getUserClient(req.userToken);
   const { data, error } = await db
     .from('sales')
-    .select('*, sale_lines(*)')
+    .select('*, sale_lines(*), customers(name)')
     .eq('shop_id', shopId)
     .order('created_at', { ascending: false });
 

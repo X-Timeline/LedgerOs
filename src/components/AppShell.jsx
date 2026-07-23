@@ -5,7 +5,7 @@ import {
   ShoppingBag, Receipt, BarChart3, UserCog, Settings, HelpCircle,
   Search, Bell, Menu, X, ChevronDown, Store, Layers, TrendingUp, Wallet, LogOut
 } from "lucide-react";
-import { supabase } from "../lib/supabaseClient.js";
+import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const C = {
@@ -43,16 +43,10 @@ export default function AppShell() {
 
   useEffect(() => {
     if (!user) return;
-    // RLS (has_shop_access) already limits this to shops the logged-in user
-    // can see — no need to filter by user id here.
-    supabase
-      .from("shops")
-      .select("id, name")
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (error || !data) return;
-        setShops([ALL_SHOPS, ...data]);
-      });
+    api
+      .get("/shops")
+      .then((data) => setShops([ALL_SHOPS, ...data]))
+      .catch(() => {}); // shop switcher just stays on "All Shops" if this fails
   }, [user]);
 
   return (

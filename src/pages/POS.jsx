@@ -1,8 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   Search, Plus, Minus, X, ShoppingCart, Banknote, Landmark, Clock,
-  User, ChevronDown, Check, Trash2, Package
+  User, ChevronDown, Check, Trash2, Package, AlertCircle
 } from "lucide-react";
+import { api } from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const C = {
   primary: "#2563EB",
@@ -17,64 +20,36 @@ const C = {
   border: "#E2E8F0",
 };
 
-const CURRENCY = "₦"; // Business.currency — hardcoded here for the preview, driven by settings in the real app
+const CURRENCY = "₦"; // Business.currency — hardcoded here for now, driven by Settings later
 const money = (n) => CURRENCY + Math.round(n).toLocaleString("en-NG");
 
-const products = [
-  {
-    id: "p1", name: "Golden Morn", stockBase: 42, baseUnit: "carton",
-    units: [
-      { name: "carton", price: 8000, factor: 1 },
-      { name: "packet", price: 500, factor: 20 },
-    ],
-  },
-  {
-    id: "p2", name: "Peak Milk 400g", stockBase: 4, baseUnit: "carton",
-    units: [
-      { name: "carton", price: 22000, factor: 1 },
-      { name: "tin", price: 950, factor: 24 },
-    ],
-  },
-  {
-    id: "p3", name: "Indomie Super Pack", stockBase: 3, baseUnit: "carton",
-    units: [
-      { name: "carton", price: 6200, factor: 1 },
-      { name: "pack", price: 450, factor: 40 },
-    ],
-  },
-  {
-    id: "p4", name: "Dangote Sugar 1kg", stockBase: 7, baseUnit: "bag",
-    units: [
-      { name: "bag", price: 12000, factor: 1 },
-      { name: "unit", price: 1400, factor: 10 },
-    ],
-  },
-  {
-    id: "p5", name: "Kellogg's Corn Flakes", stockBase: 6, baseUnit: "pack",
-    units: [{ name: "pack", price: 3200, factor: 1 }],
-  },
-  {
-    id: "p6", name: "Coca-Cola 50cl (crate)", stockBase: 18, baseUnit: "crate",
-    units: [
-      { name: "crate", price: 4500, factor: 1 },
-      { name: "bottle", price: 250, factor: 24 },
-    ],
-  },
-];
+function unitsFor(product) {
+  const own = { name: product.base_unit, conversion: 1 };
+  const extra = (product.product_units || []).map((u) => ({ name: u.unit_name, conversion: Number(u.conversion_to_base) }));
+  return [own, ...extra];
+}
 
-const customers = [
-  { id: "c1", name: "Ngozi Umeh", phone: "0803 xxx xxx1" },
-  { id: "c2", name: "Chuka Stores", phone: "0806 xxx xxx2" },
-  { id: "c3", name: "Blessing Eze", phone: "0701 xxx xxx3" },
-];
+function baseStock(product) {
+  return (product.purchase_lots || []).reduce((s, l) => s + Number(l.remaining_quantity), 0);
+}
 
-const availableInUnit = (product, unitName) => {
-  const u = product.units.find((x) => x.name === unitName);
-  return Math.floor(product.stockBase * u.factor);
-};
+function availableInUnit(product, unitName) {
+  const u = unitsFor(product).find((x) => x.name === unitName);
+  if (!u) return 0;
+  return Math.floor(baseStock(product) * u.conversion);
+}
 
 export default function POS() {
+  const { selectedShop } = useOutletContext();
+  const { user } = useAuth();
+  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+
   const [query, setQuery] = useState("");
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [posting, setPosting] = useState(false);
   const [cart, setCart] = useState([]); // {key, productId, name, unit, price, qty, maxQty}
   const [unitPicker, setUnitPicker] = useState(null); // productId being chosen
   const [cartOpen, setCartOpen] = useState(false); // mobile cart modal — opens when a product is added
@@ -83,13 +58,33 @@ export default function POS() {
   const [customer, setCustomer] = useState(null);
   const [posted, setPosted] = useState(null); // last completed sale summary
 
+  const refresh = useCallback(() => {
+    if (!shopId) return;
+    setLoading(true);
+    Promise.all([
+      api.get(`/products?shopId=${shopId}`),
+      api.get(`/customers?shopId=${shopId}`),
+    ])
+      .then(([productsData, customersData]) => {
+        setLoading(false);
+        setProducts(productsData || []);
+        setCustomers(customersData || []);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(err.message);
+      });
+  }, [shopId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase())
   );
 
-  const addToCart = (product, unit) => {
-    const key = `${product.id}:${unit.name}`;
-    const max = availableInUnit(product, unit.name);
+  const addToCart = (product, unitName) => {
+    const key = `${product.id}:${unitName}`;
+    const max = availableInUnit(product, unitName);
     setCart((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
@@ -99,7 +94,7 @@ export default function POS() {
       if (max <= 0) return prev;
       return [
         ...prev,
-        { key, productId: product.id, name: product.name, unit: unit.name, price: unit.price, qty: 1, maxQty: max },
+        { key, productId: product.id, name: product.name, unit: unitName, price: 0, qty: 1, maxQty: max },
       ];
     });
     setUnitPicker(null);
@@ -116,25 +111,62 @@ export default function POS() {
     );
   };
 
+  const changePrice = (key, price) => {
+    setCart((prev) => prev.map((i) => (i.key === key ? { ...i, price: Number(price) || 0 } : i)));
+  };
+
   const removeItem = (key) => setCart((prev) => prev.filter((i) => i.key !== key));
 
   const total = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.qty, 0), [cart]);
 
-  const canPost = cart.length > 0 && (payment !== "credit" || customer);
+  const canPost = cart.length > 0 && cart.every((i) => i.price > 0) && (payment !== "credit" || customer);
 
-  const postSale = () => {
+  const postSale = async () => {
+    setError("");
+    setPosting(true);
+    const lines = cart.map((i) => ({
+      productId: i.productId,
+      unitSold: i.unit,
+      quantity: i.qty,
+      unitPrice: i.price,
+    }));
+
+    try {
+      await api.post("/sales", {
+        shopId,
+        customerId: payment === "credit" ? customer?.id : null,
+        channel: payment.toUpperCase(),
+        lines,
+      });
+    } catch (err) {
+      setPosting(false);
+      return setError(err.message);
+    }
+
+    setPosting(false);
     setPosted({
       total,
       items: cart.length,
       payment,
       customer: payment === "credit" ? customer?.name : null,
-      postedBy: "Chidi (Cashier)",
+      postedBy: user?.user_metadata?.name || user?.email || "You",
     });
     setCart([]);
     setCustomer(null);
     setPayment("cash");
     setCartOpen(false);
+    refresh(); // stock just changed server-side — pull the new numbers
   };
+
+  if (!shopId) {
+    return (
+      <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+        <p className="text-sm text-slate-400 text-center max-w-xs">
+          Select a specific shop from the switcher above to make a sale — "All Shops" doesn't apply here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col lg:flex-row" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
@@ -143,12 +175,19 @@ export default function POS() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-900">New Sale</h1>
-            <p className="text-xs text-slate-400">Chase Furniture</p>
+            <p className="text-xs text-slate-400">{selectedShop.name}</p>
           </div>
           <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-white border rounded-full px-3 py-1.5" style={{ borderColor: C.border }}>
-            <User size={13} /> Chidi (Cashier)
+            <User size={13} /> {user?.user_metadata?.name || user?.email}
           </span>
         </div>
+
+        {error && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mb-4">
+            <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 bg-white border rounded-xl px-3 py-2.5 mb-4" style={{ borderColor: C.border }}>
           <Search size={16} className="text-slate-400 shrink-0" />
@@ -160,9 +199,15 @@ export default function POS() {
           />
         </div>
 
+        {loading && <p className="text-xs text-slate-400 text-center py-10">Loading…</p>}
+        {!loading && products.length === 0 && (
+          <p className="text-xs text-slate-400 text-center py-10">No products yet — add some from Inventory first.</p>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((p) => {
-            const low = p.stockBase <= 5;
+            const stock = baseStock(p);
+            const low = stock <= 5;
             return (
               <button
                 key={p.id}
@@ -174,9 +219,8 @@ export default function POS() {
                   <Package size={17} style={{ color: C.primary }} />
                 </div>
                 <p className="text-[13px] font-semibold text-slate-900 leading-snug">{p.name}</p>
-                <p className="text-xs text-slate-400 mt-0.5">from {money(Math.min(...p.units.map((u) => u.price)))}</p>
                 <p className={`text-[11px] font-medium mt-2 ${low ? "text-amber-600" : "text-slate-400"}`}>
-                  {p.stockBase} {p.baseUnit}{p.stockBase === 1 ? "" : "s"} left
+                  {stock} {p.base_unit}{stock === 1 ? "" : "s"} left
                 </p>
               </button>
             );
@@ -199,13 +243,13 @@ export default function POS() {
                       </button>
                     </div>
                     <div className="space-y-2">
-                      {p.units.map((u) => {
+                      {unitsFor(p).map((u) => {
                         const avail = availableInUnit(p, u.name);
                         return (
                           <button
                             key={u.name}
                             disabled={avail <= 0}
-                            onClick={() => addToCart(p, u)}
+                            onClick={() => addToCart(p, u.name)}
                             className="w-full flex items-center justify-between rounded-xl border px-4 py-3 disabled:opacity-40 hover:border-blue-300"
                             style={{ borderColor: C.border }}
                           >
@@ -213,7 +257,6 @@ export default function POS() {
                               <p className="text-[13px] font-medium text-slate-900 capitalize">{u.name}</p>
                               <p className="text-[11px] text-slate-400">{avail} available</p>
                             </div>
-                            <span className="text-[13px] font-semibold tabular-nums text-slate-900">{money(u.price)}</span>
                           </button>
                         );
                       })}
@@ -246,7 +289,19 @@ export default function POS() {
               <div key={i.key} className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-slate-900 truncate">{i.name}</p>
-                  <p className="text-[11px] text-slate-400 capitalize">{i.unit} · {money(i.price)} each</p>
+                  <p className="text-[11px] text-slate-400 capitalize flex items-center gap-1">
+                    {i.unit} ·
+                    <span className="text-slate-400">₦</span>
+                    <input
+                      type="number"
+                      value={i.price || ""}
+                      onChange={(e) => changePrice(i.key, e.target.value)}
+                      placeholder="price"
+                      className="w-16 border-b border-dashed outline-none bg-transparent"
+                      style={{ borderColor: C.border }}
+                    />
+                    each
+                  </p>
                 </div>
                 <div className="flex items-center gap-1.5 border rounded-lg" style={{ borderColor: C.border }}>
                   <button onClick={() => changeQty(i.key, -1)} className="p-1.5 hover:bg-slate-50 rounded-l-lg">
@@ -326,11 +381,11 @@ export default function POS() {
 
           <button
             onClick={postSale}
-            disabled={!canPost}
+            disabled={!canPost || posting}
             className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
             style={{ backgroundColor: C.primary }}
           >
-            Complete Sale
+            {posting ? "Posting…" : "Complete Sale"}
           </button>
         </div>
       </div>
@@ -366,7 +421,19 @@ export default function POS() {
                   <div key={i.key} className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-slate-900 truncate">{i.name}</p>
-                      <p className="text-[11px] text-slate-400 capitalize">{i.unit} · {money(i.price)} each</p>
+                      <p className="text-[11px] text-slate-400 capitalize flex items-center gap-1">
+                    {i.unit} ·
+                    <span className="text-slate-400">₦</span>
+                    <input
+                      type="number"
+                      value={i.price || ""}
+                      onChange={(e) => changePrice(i.key, e.target.value)}
+                      placeholder="price"
+                      className="w-16 border-b border-dashed outline-none bg-transparent"
+                      style={{ borderColor: C.border }}
+                    />
+                    each
+                  </p>
                     </div>
                     <div className="flex items-center gap-1.5 border rounded-lg" style={{ borderColor: C.border }}>
                       <button onClick={() => changeQty(i.key, -1)} className="p-1.5 hover:bg-slate-50 rounded-l-lg">
@@ -446,11 +513,11 @@ export default function POS() {
 
               <button
                 onClick={postSale}
-                disabled={!canPost}
+                disabled={!canPost || posting}
                 className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
                 style={{ backgroundColor: C.primary }}
               >
-                Complete Sale
+                {posting ? "Posting…" : "Complete Sale"}
               </button>
             </div>
           </div>

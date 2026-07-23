@@ -1,47 +1,95 @@
-import { useState } from "react";
-import { BarChart3, TrendingUp, Scale, Clock, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
+import { BarChart3, TrendingUp, Scale, Clock, AlertTriangle, AlertCircle } from "lucide-react";
+import { api } from "../lib/api.js";
 
 const C = { primary: "#2563EB", success: "#22C55E", warning: "#F59E0B", danger: "#EF4444", bg: "#F8FAFC", border: "#E2E8F0" };
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
+const EPOCH = "1970-01-01T00:00:00Z";
 
-// Mock figures — in the real app these are live-computed from the ledger, not stored
-const trading = { sales: 3120000, cogs: 1980000, expenses: 480000 };
-const balanceSheet = {
-  cash: 412300, bank: 1284000, inventory: 3120000, debtors: 96500,
-  payables: 145000, openingCapital: 5000000,
-};
-
-const agingProducts = [
-  { name: "Golden Morn", daysSince: 8, moving: "fast" },
-  { name: "Peak Milk 400g", daysSince: 14, moving: "normal" },
-  { name: "Indomie Super Pack", daysSince: 5, moving: "fast" },
-  { name: "Dangote Sugar 1kg", daysSince: 62, moving: "slow" },
-  { name: "Kellogg's Corn Flakes", daysSince: 91, moving: "dead" },
-];
-
-const movingMeta = {
-  fast: { label: "Fast-moving", color: C.success },
-  normal: { label: "Normal", color: C.primary },
-  slow: { label: "Slow-moving", color: C.warning },
-  dead: { label: "Dead stock", color: C.danger },
-};
+function movingLabel(daysOld) {
+  if (daysOld <= 14) return { key: "fast", label: "Fast-moving", color: C.success };
+  if (daysOld <= 45) return { key: "normal", label: "Normal", color: C.primary };
+  if (daysOld <= 75) return { key: "slow", label: "Slow-moving", color: C.warning };
+  return { key: "dead", label: "Dead stock", color: C.danger };
+}
 
 export default function Reports() {
+  const { selectedShop } = useOutletContext();
+  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+
   const [tab, setTab] = useState("trading");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [trading, setTrading] = useState(null);
+  const [pnl, setPnl] = useState(null);
+  const [balanceSheet, setBalanceSheet] = useState(null);
+  const [aging, setAging] = useState([]);
+  const [capitalNet, setCapitalNet] = useState(0);
 
-  const grossProfit = trading.sales - trading.cogs;
-  const netProfit = grossProfit - trading.expenses;
+  const refresh = useCallback(() => {
+    if (!shopId) return;
+    setLoading(true);
+    const now = new Date().toISOString();
+    Promise.all([
+      api.get(`/reports/trading-account?shopId=${shopId}&start=${EPOCH}&end=${now}`),
+      api.get(`/reports/profit-and-loss?shopId=${shopId}&start=${EPOCH}&end=${now}`),
+      api.get(`/reports/balance-sheet?shopId=${shopId}&asOf=${now}`),
+      api.get(`/reports/inventory-aging?shopId=${shopId}`),
+      api.get(`/capital?shopId=${shopId}`),
+    ])
+      .then(([tradingData, pnlData, bsData, agingData, capitalData]) => {
+        setLoading(false);
+        setTrading(tradingData);
+        setPnl(pnlData);
+        setBalanceSheet(bsData);
+        setAging(agingData || []);
+        const net = (capitalData || []).reduce(
+          (s, e) => s + (e.direction === "IN" ? Number(e.amount) : -Number(e.amount)),
+          0
+        );
+        setCapitalNet(net);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(err.message);
+      });
+  }, [shopId]);
 
-  const assets = balanceSheet.cash + balanceSheet.bank + balanceSheet.inventory + balanceSheet.debtors;
-  const liabilities = balanceSheet.payables;
-  const equity = assets - liabilities;
-  const reconciled = balanceSheet.openingCapital + netProfit;
+  useEffect(() => { refresh(); }, [refresh]);
+
+  if (!shopId) {
+    return (
+      <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+        <p className="text-sm text-slate-400 text-center max-w-xs">
+          Select a specific shop from the switcher above to view its reports — business-wide reports aren't wired yet.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading || !trading || !pnl || !balanceSheet) {
+    return (
+      <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+        {error ? (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 max-w-sm">
+            <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">Loading…</p>
+        )}
+      </div>
+    );
+  }
+
+  const reconciled = capitalNet + pnl.netProfit;
 
   return (
     <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <h1 className="text-lg font-semibold text-slate-900">Reports</h1>
-        <p className="text-xs text-slate-400 mb-4">Chase Furniture · Year to date</p>
+        <p className="text-xs text-slate-400 mb-4">{selectedShop.name} · All time</p>
 
         <div className="flex gap-1 mb-5 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
           {[
@@ -63,13 +111,13 @@ export default function Reports() {
           <div className="rounded-2xl bg-white border p-5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Trading Account & P&L</h3>
             <div className="space-y-3">
-              <Row label="Sales" value={trading.sales} />
-              <Row label="Cost of Goods Sold" value={-trading.cogs} negative />
+              <Row label="Sales" value={trading.totalSales} />
+              <Row label="Cost of Goods Sold" value={-trading.totalCOGS} negative />
               <Divider />
-              <Row label="Gross Profit" value={grossProfit} bold />
-              <Row label="Expenses" value={-trading.expenses} negative />
+              <Row label="Gross Profit" value={trading.grossProfit} bold />
+              <Row label="Expenses" value={-pnl.totalExpenses} negative />
               <Divider />
-              <Row label="Net Profit" value={netProfit} bold big color={netProfit >= 0 ? C.success : C.danger} />
+              <Row label="Net Profit" value={pnl.netProfit} bold big color={pnl.netProfit >= 0 ? C.success : C.danger} />
             </div>
           </div>
         )}
@@ -84,26 +132,26 @@ export default function Reports() {
               <div className="space-y-2 mb-4">
                 <Row label="Cash on Hand" value={balanceSheet.cash} small />
                 <Row label="Bank Balance" value={balanceSheet.bank} small />
-                <Row label="Inventory (at cost)" value={balanceSheet.inventory} small />
-                <Row label="Owed by Customers" value={balanceSheet.debtors} small />
+                <Row label="Inventory (at cost)" value={balanceSheet.inventoryValue} small />
+                <Row label="Owed by Customers" value={balanceSheet.customerDebtOwed} small />
               </div>
               <Divider />
-              <Row label="Total Assets" value={assets} bold />
+              <Row label="Total Assets" value={balanceSheet.assets} bold />
 
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-4 mb-2">Liabilities</p>
-              <Row label="Owed to Suppliers" value={liabilities} small />
+              <Row label="Owed to Suppliers" value={balanceSheet.liabilities} small />
               <Divider />
-              <Row label="Total Liabilities" value={liabilities} bold />
+              <Row label="Total Liabilities" value={balanceSheet.liabilities} bold />
 
               <Divider />
-              <Row label="Equity (Assets − Liabilities)" value={equity} bold big color={C.primary} />
+              <Row label="Equity (Assets − Liabilities)" value={balanceSheet.equity} bold big color={C.primary} />
             </div>
 
             <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4">
               <p className="text-[12px] text-blue-700 leading-relaxed">
-                Reconciliation check: opening capital ({naira(balanceSheet.openingCapital)}) + net profit
-                ({naira(netProfit)}) = <span className="font-semibold">{naira(reconciled)}</span>.
-                {" "}This should match Equity above{equity === reconciled ? " — it does." : `; currently off by ${naira(Math.abs(equity - reconciled))}, worth checking for an unrecorded entry.`}
+                Reconciliation check: net capital contributed ({naira(capitalNet)}) + net profit
+                ({naira(pnl.netProfit)}) = <span className="font-semibold">{naira(reconciled)}</span>.
+                {" "}This should match Equity above{Math.abs(balanceSheet.equity - reconciled) < 1 ? " — it does." : `; currently off by ${naira(Math.abs(balanceSheet.equity - reconciled))}, worth checking for an unrecorded entry.`}
               </p>
             </div>
           </div>
@@ -111,15 +159,18 @@ export default function Reports() {
 
         {tab === "aging" && (
           <div className="space-y-2">
-            {agingProducts.map((p) => {
-              const meta = movingMeta[p.moving];
+            {aging.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-10">No stock on hand yet.</p>
+            )}
+            {aging.map((p) => {
+              const meta = movingLabel(Number(p.days_old));
               return (
-                <div key={p.name} className="flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+                <div key={p.product_id} className="flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
                   <div className="flex items-center gap-3">
-                    {(p.moving === "slow" || p.moving === "dead") && <AlertTriangle size={15} style={{ color: meta.color }} />}
+                    {(meta.key === "slow" || meta.key === "dead") && <AlertTriangle size={15} style={{ color: meta.color }} />}
                     <div>
-                      <p className="text-[13.5px] font-medium text-slate-900">{p.name}</p>
-                      <p className="text-[11px] text-slate-400">{p.daysSince} days since oldest unsold lot</p>
+                      <p className="text-[13.5px] font-medium text-slate-900">{p.product_name}</p>
+                      <p className="text-[11px] text-slate-400">{Math.round(p.days_old)} days since oldest unsold lot</p>
                     </div>
                   </div>
                   <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ color: meta.color, backgroundColor: `${meta.color}14` }}>

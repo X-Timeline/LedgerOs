@@ -5,8 +5,9 @@ const { getUserClient } = require('../config/supabaseClient');
 const router = express.Router();
 
 // POST /products - add a new product to a shop
+// body: { shopId, name, baseUnit, costingMethod, sellUnits?: [{ name, conversionToBase }] }
 router.post('/', requireAuth, async (req, res) => {
-  const { shopId, name, baseUnit, costingMethod } = req.body;
+  const { shopId, name, baseUnit, costingMethod, sellUnits } = req.body;
 
   if (!shopId || !name || !baseUnit) {
     return res.status(400).json({ error: 'shopId, name and baseUnit are required' });
@@ -14,7 +15,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   const db = getUserClient(req.userToken);
 
-  const { data, error } = await db
+  const { data: product, error } = await db
     .from('products')
     .insert({
       shop_id: shopId,
@@ -26,10 +27,42 @@ router.post('/', requireAuth, async (req, res) => {
     .single();
 
   if (error) return res.status(400).json({ error: error.message });
+
+  if (Array.isArray(sellUnits) && sellUnits.length > 0) {
+    const { error: unitsError } = await db.from('product_units').insert(
+      sellUnits.map((u) => ({
+        product_id: product.id,
+        unit_name: u.name,
+        conversion_to_base: u.conversionToBase,
+      }))
+    );
+    if (unitsError) return res.status(400).json({ error: unitsError.message });
+  }
+
+  res.status(201).json(product);
+});
+
+// POST /products/:id/units - add a sell-unit conversion to an existing product
+// body: { name, conversionToBase }
+router.post('/:id/units', requireAuth, async (req, res) => {
+  const { name, conversionToBase } = req.body;
+  if (!name || !conversionToBase) {
+    return res.status(400).json({ error: 'name and conversionToBase are required' });
+  }
+
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db
+    .from('product_units')
+    .insert({ product_id: req.params.id, unit_name: name, conversion_to_base: conversionToBase })
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
   res.status(201).json(data);
 });
 
-// GET /products?shopId=... - list all products for a shop
+// GET /products?shopId=... - list all products for a shop, with their sell
+// units and purchase lots embedded so the frontend doesn't need N+1 requests
 router.get('/', requireAuth, async (req, res) => {
   const { shopId } = req.query;
   if (!shopId) return res.status(400).json({ error: 'shopId query param is required' });
@@ -38,7 +71,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   const { data, error } = await db
     .from('products')
-    .select('*')
+    .select('*, product_units(*), purchase_lots(*)')
     .eq('shop_id', shopId)
     .order('created_at', { ascending: false });
 

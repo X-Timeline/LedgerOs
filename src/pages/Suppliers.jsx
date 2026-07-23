@@ -1,69 +1,129 @@
-import { useState } from "react";
-import { Truck, Plus, ChevronLeft, ArrowUp, ArrowDown, Phone, X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
+import { Truck, Plus, ChevronLeft, ArrowUp, ArrowDown, Phone, X, AlertCircle } from "lucide-react";
+import { api } from "../lib/api.js";
 
 const C = { primary: "#2563EB", success: "#22C55E", warning: "#F59E0B", bg: "#F8FAFC", border: "#E2E8F0" };
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
 
-const initialSuppliers = [
-  {
-    id: "s1", name: "Dangote Distribution Ltd", phone: "0812 111 2233",
-    entries: [
-      { id: "y1", type: "charge", amount: 145000, note: "Stock bought on credit", date: "2026-07-09" },
-    ],
-  },
-  {
-    id: "s2", name: "Golden Foods Wholesale", phone: "0705 444 5566",
-    entries: [
-      { id: "y2", type: "charge", amount: 96000, note: "Restock on credit", date: "2026-07-14" },
-      { id: "y3", type: "payment", amount: 50000, note: "Part payment", date: "2026-07-17" },
-    ],
-  },
-];
-
-const owed = (s) => s.entries.reduce((sum, e) => sum + (e.type === "charge" ? e.amount : -e.amount), 0);
-
 export default function Suppliers() {
-  const [suppliers, setSuppliers] = useState(initialSuppliers);
+  const { selectedShop } = useOutletContext();
+  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [selected, setSelected] = useState(null);
+  const [ledger, setLedger] = useState({ entries: [], balanceOwed: 0 });
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+
   const [showAdd, setShowAdd] = useState(false);
   const [newSupplier, setNewSupplier] = useState({ name: "", phone: "" });
-  const [entryForm, setEntryForm] = useState({ type: "payment", amount: "", note: "" });
+  const [entryForm, setEntryForm] = useState({ type: "payment", amount: "", channel: "cash" });
 
-  const supplier = suppliers.find((s) => s.id === selected);
+  const refresh = useCallback(() => {
+    if (!shopId) return;
+    setLoading(true);
+    api
+      .get(`/suppliers?shopId=${shopId}`)
+      .then((data) => {
+        setLoading(false);
+        setSuppliers(data || []);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(err.message);
+      });
+  }, [shopId]);
 
-  const addSupplier = () => {
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const openSupplier = (s) => {
+    setSelected(s);
+    setLedgerLoading(true);
+    api
+      .get(`/suppliers/${s.id}/balance`)
+      .then((data) => {
+        setLedgerLoading(false);
+        setLedger(data);
+      })
+      .catch((err) => {
+        setLedgerLoading(false);
+        setError(err.message);
+      });
+  };
+
+  const addSupplier = async () => {
     if (!newSupplier.name) return;
-    setSuppliers((prev) => [...prev, { id: "s" + Date.now(), ...newSupplier, entries: [] }]);
-    setNewSupplier({ name: "", phone: "" });
-    setShowAdd(false);
+    setSaving(true);
+    setError("");
+    try {
+      await api.post("/suppliers", { shopId, name: newSupplier.name, phone: newSupplier.phone });
+      setSaving(false);
+      setNewSupplier({ name: "", phone: "" });
+      setShowAdd(false);
+      refresh();
+    } catch (err) {
+      setSaving(false);
+      setError(err.message);
+    }
   };
 
-  const addEntry = () => {
-    if (!entryForm.amount) return;
-    setSuppliers((prev) =>
-      prev.map((s) =>
-        s.id === selected
-          ? { ...s, entries: [{ id: "y" + Date.now(), ...entryForm, amount: Number(entryForm.amount), date: new Date().toISOString().slice(0, 10) }, ...s.entries] }
-          : s
-      )
+  const addEntry = async () => {
+    if (!entryForm.amount || !selected) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.post(`/suppliers/${selected.id}/balance`, {
+        shopId,
+        type: entryForm.type === "charge" ? "CHARGE" : "PAYMENT",
+        amount: Number(entryForm.amount),
+        channel: entryForm.channel.toUpperCase(),
+      });
+      setSaving(false);
+      setEntryForm({ type: "payment", amount: "", channel: "cash" });
+      openSupplier(selected);
+    } catch (err) {
+      setSaving(false);
+      setError(err.message);
+    }
+  };
+
+  if (!shopId) {
+    return (
+      <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+        <p className="text-sm text-slate-400 text-center max-w-xs">
+          Select a specific shop from the switcher above — suppliers are tracked per shop.
+        </p>
+      </div>
     );
-    setEntryForm({ type: "payment", amount: "", note: "" });
-  };
+  }
 
-  if (supplier) {
-    const balance = owed(supplier);
+  if (selected) {
     return (
       <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
         <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
           <button onClick={() => setSelected(null)} className="flex items-center gap-1 text-xs font-medium text-slate-500 mb-4">
             <ChevronLeft size={14} /> All suppliers
           </button>
+
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mb-4">
+              <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+            </div>
+          )}
+
           <div className="rounded-2xl bg-white border p-5 mb-5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
-            <h1 className="text-base font-semibold text-slate-900">{supplier.name}</h1>
-            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><Phone size={11} /> {supplier.phone}</p>
+            <h1 className="text-base font-semibold text-slate-900">{selected.name}</h1>
+            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><Phone size={11} /> {selected.phone}</p>
             <div className="mt-4 flex items-center justify-between">
               <span className="text-xs text-slate-500">You owe</span>
-              <span className={`text-xl font-semibold tabular-nums ${balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>{naira(Math.abs(balance))}</span>
+              <span className={`text-xl font-semibold tabular-nums ${ledger.balanceOwed > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                {ledgerLoading ? "…" : naira(Math.abs(ledger.balanceOwed))}
+              </span>
             </div>
           </div>
 
@@ -92,26 +152,30 @@ export default function Suppliers() {
                 style={{ borderColor: C.border }}
               />
             </div>
-            <button onClick={addEntry} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ backgroundColor: C.primary }}>
-              Save Entry
+            <button onClick={addEntry} disabled={saving} className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: C.primary }}>
+              {saving ? "Saving…" : "Save Entry"}
             </button>
           </div>
 
           <h4 className="text-xs font-medium text-slate-500 mb-2">History</h4>
           <div className="space-y-2">
-            {supplier.entries.map((e) => (
+            {ledgerLoading && <p className="text-xs text-slate-400 text-center py-6">Loading…</p>}
+            {!ledgerLoading && ledger.entries.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-6">No entries yet.</p>
+            )}
+            {ledger.entries.slice().reverse().map((e) => (
               <div key={e.id} className="flex items-center justify-between bg-white border rounded-xl px-4 py-3" style={{ borderColor: C.border }}>
                 <div className="flex items-center gap-2.5">
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: e.type === "charge" ? `${C.warning}14` : `${C.success}14` }}>
-                    {e.type === "charge" ? <ArrowUp size={13} style={{ color: C.warning }} /> : <ArrowDown size={13} style={{ color: C.success }} />}
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: e.type === "CHARGE" ? `${C.warning}14` : `${C.success}14` }}>
+                    {e.type === "CHARGE" ? <ArrowUp size={13} style={{ color: C.warning }} /> : <ArrowDown size={13} style={{ color: C.success }} />}
                   </span>
                   <div>
-                    <p className="text-[13px] font-medium text-slate-900">{e.note}</p>
-                    <p className="text-[11px] text-slate-400">{e.date}</p>
+                    <p className="text-[13px] font-medium text-slate-900">{e.type === "CHARGE" ? "Purchase on credit" : "Payment made"}</p>
+                    <p className="text-[11px] text-slate-400">{new Date(e.date).toISOString().slice(0, 10)}</p>
                   </div>
                 </div>
-                <span className={`text-[13px] font-semibold tabular-nums ${e.type === "charge" ? "text-amber-600" : "text-emerald-600"}`}>
-                  {e.type === "charge" ? "+" : "−"}{naira(e.amount)}
+                <span className={`text-[13px] font-semibold tabular-nums ${e.type === "CHARGE" ? "text-amber-600" : "text-emerald-600"}`}>
+                  {e.type === "CHARGE" ? "+" : "−"}{naira(e.amount)}
                 </span>
               </div>
             ))}
@@ -127,33 +191,39 @@ export default function Suppliers() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-lg font-semibold text-slate-900">Suppliers</h1>
-            <p className="text-xs text-slate-400">Chase Furniture</p>
+            <p className="text-xs text-slate-400">{selectedShop.name}</p>
           </div>
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-xl px-3.5 py-2" style={{ backgroundColor: C.primary }}>
             <Plus size={14} /> Add
           </button>
         </div>
 
+        {error && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mb-4">
+            <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+          </div>
+        )}
+
         <div className="space-y-2">
-          {suppliers.map((s) => {
-            const balance = owed(s);
-            return (
-              <button key={s.id} onClick={() => setSelected(s.id)} className="w-full flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
-                <div className="flex items-center gap-3">
-                  <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: `${C.primary}12` }}>
-                    <Truck size={15} style={{ color: C.primary }} />
-                  </span>
-                  <div className="text-left">
-                    <p className="text-[13.5px] font-semibold text-slate-900">{s.name}</p>
-                    <p className="text-[11px] text-slate-400">{s.phone}</p>
-                  </div>
-                </div>
-                <span className={`text-[13px] font-semibold tabular-nums ${balance > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                  {balance > 0 ? naira(balance) : "Settled"}
+          {loading && <p className="text-xs text-slate-400 text-center py-10">Loading…</p>}
+          {!loading && suppliers.length === 0 && (
+            <p className="text-xs text-slate-400 text-center py-10">No suppliers yet — add your first one.</p>
+          )}
+          {suppliers.map((s) => (
+            <button key={s.id} onClick={() => openSupplier(s)} className="w-full flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: `${C.primary}12` }}>
+                  <Truck size={15} style={{ color: C.primary }} />
                 </span>
-              </button>
-            );
-          })}
+                <div className="text-left">
+                  <p className="text-[13.5px] font-semibold text-slate-900">{s.name}</p>
+                  <p className="text-[11px] text-slate-400">{s.phone}</p>
+                </div>
+              </div>
+              <ChevronLeft size={16} className="text-slate-300 rotate-180" />
+            </button>
+          ))}
         </div>
 
         {showAdd && (
@@ -178,8 +248,8 @@ export default function Suppliers() {
                 className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none mb-4"
                 style={{ borderColor: C.border }}
               />
-              <button onClick={addSupplier} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ backgroundColor: C.primary }}>
-                Add Supplier
+              <button onClick={addSupplier} disabled={saving} className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: C.primary }}>
+                {saving ? "Saving…" : "Add Supplier"}
               </button>
             </div>
           </div>

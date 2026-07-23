@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, Store, ArrowRight, Check, AlertCircle } from "lucide-react";
-import { supabase } from "../lib/supabaseClient.js";
+import { api } from "../lib/api.js";
 
 const C = { primary: "#2563EB", primaryDark: "#1D4ED8", success: "#22C55E", danger: "#EF4444", bg: "#F8FAFC", border: "#E2E8F0" };
 const currencies = ["NGN — Nigerian Naira (₦)", "GHS — Ghanaian Cedi (₵)", "KES — Kenyan Shilling (KSh)", "USD — US Dollar ($)"];
@@ -24,35 +24,31 @@ export default function Onboarding() {
     setError("");
     setLoading(true);
 
-    const { data, error: rpcError } = await supabase
-      .rpc("create_business_with_shop", { p_business_name: business.name, p_shop_name: shop.name })
-      .single();
-
-    if (rpcError) {
-      setLoading(false);
-      return setError(rpcError.message);
-    }
-
-    // The RPC doesn't take a currency argument — set it as a follow-up update.
-    const currencyCode = business.currency.slice(0, 3);
-    await supabase.from("businesses").update({ currency: currencyCode }).eq("id", data.business_id);
-
-    if (shop.capital) {
-      const { error: capitalError } = await supabase.from("capital_entries").insert({
-        shop_id: data.shop_id,
-        direction: "IN",
-        amount: Number(shop.capital),
-        channel: "CASH",
-        note: "Opening capital",
+    try {
+      const { business_id, shop_id } = await api.post("/businesses", {
+        businessName: business.name,
+        shopName: shop.name,
       });
-      if (capitalError) {
-        setLoading(false);
-        return setError(capitalError.message);
-      }
-    }
 
-    setLoading(false);
-    navigate("/dashboard");
+      const currencyCode = business.currency.slice(0, 3);
+      await api.patch(`/businesses/${business_id}`, { currency: currencyCode });
+
+      if (shop.capital) {
+        await api.post("/capital", {
+          shopId: shop_id,
+          direction: "IN",
+          amount: Number(shop.capital),
+          channel: "CASH",
+          note: "Opening capital",
+        });
+      }
+
+      setLoading(false);
+      navigate("/dashboard");
+    } catch (err) {
+      setLoading(false);
+      setError(err.message);
+    }
   };
 
   return (

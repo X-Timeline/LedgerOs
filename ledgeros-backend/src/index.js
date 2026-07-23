@@ -4,6 +4,8 @@ const cors = require('cors');
 
 const healthRoutes = require('./routes/health');
 const meRoutes = require('./routes/me');
+const businessesRoutes = require('./routes/businesses');
+const shopsRoutes = require('./routes/shops');
 const productsRoutes = require('./routes/products');
 const purchaseLotsRoutes = require('./routes/purchaseLots');
 const salesRoutes = require('./routes/sales');
@@ -22,6 +24,8 @@ app.use(express.json());
 
 app.use('/health', healthRoutes);
 app.use('/me', meRoutes);
+app.use('/businesses', businessesRoutes);
+app.use('/shops', shopsRoutes);
 app.use('/products', productsRoutes);
 app.use('/purchase-lots', purchaseLotsRoutes);
 app.use('/sales', salesRoutes);

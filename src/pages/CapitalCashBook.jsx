@@ -1,83 +1,137 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   Wallet, ArrowRightLeft, History, Banknote, Landmark, Plus,
-  ArrowUp, ArrowDown, ArrowRight
+  ArrowUp, ArrowDown, ArrowRight, AlertCircle
 } from "lucide-react";
+import { api } from "../lib/api.js";
 
 const C = {
   primary: "#2563EB", success: "#22C55E", warning: "#F59E0B", danger: "#EF4444",
   bg: "#F8FAFC", border: "#E2E8F0",
 };
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
-
-const initialEntries = [
-  { id: "e1", type: "capital", direction: "in", amount: 5000000, channel: "bank", note: "Opening capital", date: "2026-06-01" },
-  { id: "e2", type: "sale", direction: "in", amount: 204000, channel: "cash", note: "Daily sales", date: "2026-07-18" },
-  { id: "e3", type: "purchase", direction: "out", amount: 58000, channel: "bank", note: "Stock purchase", date: "2026-07-17" },
-  { id: "e4", type: "capital", direction: "out", amount: 220000, channel: "cash", note: "Owner drawing", date: "2026-07-10" },
-  { id: "e5", type: "capital", direction: "in", amount: 50000, channel: "cash", note: "Returned from purchase", date: "2026-07-11" },
-  { id: "e6", type: "transfer", direction: "cash_to_bank", amount: 100000, note: "Deposited at branch", date: "2026-07-15" },
-];
-
-const typeMeta = {
-  capital: { label: "Capital", color: C.primary },
-  sale: { label: "Sale", color: C.success },
-  purchase: { label: "Purchase", color: C.warning },
-  expense: { label: "Expense", color: C.danger },
-  transfer: { label: "Transfer", color: "#8B5CF6" },
-};
-
-function computeBalances(entries) {
-  let cash = 0, bank = 0;
-  for (const e of entries) {
-    if (e.type === "transfer") {
-      const amt = e.amount;
-      if (e.direction === "cash_to_bank") { cash -= amt; bank += amt; }
-      else { bank -= amt; cash += amt; }
-      continue;
-    }
-    const sign = e.direction === "in" ? 1 : -1;
-    if (e.channel === "cash") cash += sign * e.amount;
-    else bank += sign * e.amount;
-  }
-  return { cash, bank };
-}
+const EPOCH = "1970-01-01T00:00:00Z";
 
 export default function CapitalCashBook() {
-  const [entries, setEntries] = useState(initialEntries);
+  const { selectedShop } = useOutletContext();
+  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+
+  const [balances, setBalances] = useState({ cash: 0, bank: 0 });
+  const [capitalEntries, setCapitalEntries] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState("capital");
   const [filter, setFilter] = useState("all");
 
   const [capitalForm, setCapitalForm] = useState({ direction: "in", amount: "", channel: "cash", note: "" });
   const [transferForm, setTransferForm] = useState({ direction: "cash_to_bank", amount: "", note: "" });
 
-  const { cash, bank } = useMemo(() => computeBalances(entries), [entries]);
+  const refresh = useCallback(() => {
+    if (!shopId) return;
+    setLoading(true);
+    Promise.all([
+      api.get(`/reports/cash-book?shopId=${shopId}&start=${encodeURIComponent(EPOCH)}&end=${encodeURIComponent(new Date().toISOString())}`),
+      api.get(`/capital?shopId=${shopId}`),
+      api.get(`/transfers?shopId=${shopId}`),
+    ])
+      .then(([cashBook, capitalData, transfersData]) => {
+        setLoading(false);
+        setBalances({ cash: cashBook.cash.net, bank: cashBook.bank.net });
+        setCapitalEntries(capitalData || []);
+        setTransfers(transfersData || []);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(err.message);
+      });
+  }, [shopId]);
 
-  const addCapital = () => {
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const addCapital = async () => {
     if (!capitalForm.amount) return;
-    setEntries((prev) => [
-      { id: "e" + Date.now(), type: "capital", ...capitalForm, amount: Number(capitalForm.amount), date: new Date().toISOString().slice(0, 10) },
-      ...prev,
-    ]);
-    setCapitalForm({ direction: "in", amount: "", channel: "cash", note: "" });
+    setSaving(true);
+    setError("");
+    try {
+      await api.post("/capital", {
+        shopId,
+        direction: capitalForm.direction.toUpperCase(),
+        amount: Number(capitalForm.amount),
+        channel: capitalForm.channel.toUpperCase(),
+        note: capitalForm.note || null,
+      });
+      setSaving(false);
+      setCapitalForm({ direction: "in", amount: "", channel: "cash", note: "" });
+      refresh();
+    } catch (err) {
+      setSaving(false);
+      setError(err.message);
+    }
   };
 
-  const addTransfer = () => {
+  const addTransfer = async () => {
     if (!transferForm.amount) return;
-    setEntries((prev) => [
-      { id: "e" + Date.now(), type: "transfer", ...transferForm, amount: Number(transferForm.amount), date: new Date().toISOString().slice(0, 10) },
-      ...prev,
-    ]);
-    setTransferForm({ direction: "cash_to_bank", amount: "", note: "" });
+    setSaving(true);
+    setError("");
+    try {
+      await api.post("/transfers", {
+        shopId,
+        direction: transferForm.direction.toUpperCase(),
+        amount: Number(transferForm.amount),
+        note: transferForm.note || null,
+      });
+      setSaving(false);
+      setTransferForm({ direction: "cash_to_bank", amount: "", note: "" });
+      refresh();
+    } catch (err) {
+      setSaving(false);
+      setError(err.message);
+    }
   };
 
-  const filtered = filter === "all" ? entries : entries.filter((e) => e.type === filter);
+  const historyEntries = [
+    ...capitalEntries.map((e) => ({
+      id: e.id, type: "capital", direction: e.direction.toLowerCase(),
+      amount: Number(e.amount), channel: e.channel.toLowerCase(), note: e.note, date: e.date,
+    })),
+    ...transfers.map((e) => ({
+      id: e.id, type: "transfer", direction: e.direction.toLowerCase(),
+      amount: Number(e.amount), note: e.note, date: e.date,
+    })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const filtered = filter === "all" ? historyEntries : historyEntries.filter((e) => e.type === filter);
+
+  const typeMeta = {
+    capital: { label: "Capital", color: C.primary },
+    transfer: { label: "Transfer", color: "#8B5CF6" },
+  };
+
+  if (!shopId) {
+    return (
+      <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+        <p className="text-sm text-slate-400 text-center max-w-xs">
+          Select a specific shop from the switcher above — capital and cash book are tracked per shop.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
       <div className="max-w-2xl mx-auto px-4 py-6 lg:py-8">
         <h1 className="text-lg font-semibold text-slate-900">Capital & Cash Book</h1>
-        <p className="text-xs text-slate-400 mb-4">Chase Furniture</p>
+        <p className="text-xs text-slate-400 mb-4">{selectedShop.name}</p>
+
+        {error && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mb-4">
+            <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-[12.5px] text-red-600 leading-relaxed">{error}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 mb-5">
           <div className="rounded-2xl bg-white border p-4" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
@@ -85,14 +139,14 @@ export default function CapitalCashBook() {
               <Banknote size={15} style={{ color: C.primary }} />
             </span>
             <p className="text-[11px] text-slate-500">Cash on Hand</p>
-            <p className="text-lg font-semibold tabular-nums text-slate-900">{naira(cash)}</p>
+            <p className="text-lg font-semibold tabular-nums text-slate-900">{loading ? "…" : naira(balances.cash)}</p>
           </div>
           <div className="rounded-2xl bg-white border p-4" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
             <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2" style={{ backgroundColor: `${C.primary}14` }}>
               <Landmark size={15} style={{ color: C.primary }} />
             </span>
             <p className="text-[11px] text-slate-500">Bank Balance</p>
-            <p className="text-lg font-semibold tabular-nums text-slate-900">{naira(bank)}</p>
+            <p className="text-lg font-semibold tabular-nums text-slate-900">{loading ? "…" : naira(balances.bank)}</p>
           </div>
         </div>
 
@@ -173,8 +227,8 @@ export default function CapitalCashBook() {
                   style={{ borderColor: C.border }}
                 />
               </div>
-              <button onClick={addCapital} className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1" style={{ backgroundColor: C.primary }}>
-                <Plus size={15} /> Record Entry
+              <button onClick={addCapital} disabled={saving} className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1 disabled:opacity-50" style={{ backgroundColor: C.primary }}>
+                <Plus size={15} /> {saving ? "Saving…" : "Record Entry"}
               </button>
             </div>
           </div>
@@ -226,8 +280,8 @@ export default function CapitalCashBook() {
                   style={{ borderColor: C.border }}
                 />
               </div>
-              <button onClick={addTransfer} className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1" style={{ backgroundColor: C.primary }}>
-                <ArrowRightLeft size={15} /> Record Transfer
+              <button onClick={addTransfer} disabled={saving} className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold text-white mt-1 disabled:opacity-50" style={{ backgroundColor: C.primary }}>
+                <ArrowRightLeft size={15} /> {saving ? "Saving…" : "Record Transfer"}
               </button>
             </div>
           </div>
@@ -236,7 +290,7 @@ export default function CapitalCashBook() {
         {tab === "history" && (
           <div>
             <div className="flex gap-1.5 mb-3 flex-wrap">
-              {["all", "capital", "sale", "purchase", "expense", "transfer"].map((f) => (
+              {["all", "capital", "transfer"].map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -250,6 +304,10 @@ export default function CapitalCashBook() {
               ))}
             </div>
             <div className="space-y-2">
+              {loading && <p className="text-xs text-slate-400 text-center py-10">Loading…</p>}
+              {!loading && filtered.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-10">No entries yet.</p>
+              )}
               {filtered.map((e) => {
                 const isTransfer = e.type === "transfer";
                 const meta = typeMeta[e.type];
@@ -262,7 +320,7 @@ export default function CapitalCashBook() {
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium text-slate-900 truncate">{e.note || meta.label}</p>
                         <p className="text-[11px] text-slate-400">
-                          {meta.label} · {e.date} {!isTransfer && `· ${e.channel}`}
+                          {meta.label} · {new Date(e.date).toISOString().slice(0, 10)} {!isTransfer && `· ${e.channel}`}
                         </p>
                       </div>
                     </div>
