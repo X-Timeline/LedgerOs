@@ -233,7 +233,7 @@ export default function AppShell() {
         </header>
 
         <div className="flex-1">
-          <Outlet context={{ selectedShop }} />
+          <Outlet context={{ selectedShop, setSelectedShop }} />
         </div>
       </div>
 
@@ -258,4 +258,5 @@ export default function AppShell() {
       </nav>
     </div>
   );
-}
+   }
+    
