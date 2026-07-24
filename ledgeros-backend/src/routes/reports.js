@@ -99,4 +99,31 @@ router.get('/business/profit-and-loss', requireAuth, async (req, res) => {
   res.json(data);
 });
 
+// GET /reports/business/trading-account?businessId=&start=&end=
+router.get('/business/trading-account', requireAuth, async (req, res) => {
+  const { businessId } = req.query;
+  const { start, end } = defaultRange(req);
+  if (!businessId) return res.status(400).json({ error: 'businessId query param is required' });
+
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db.rpc('get_business_trading_account', {
+    p_business_id: businessId, p_start: start, p_end: end,
+  });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+// GET /reports/business/balance-sheet?businessId=&asOf=
+router.get('/business/balance-sheet', requireAuth, async (req, res) => {
+  const { businessId, asOf } = req.query;
+  if (!businessId) return res.status(400).json({ error: 'businessId query param is required' });
+
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db.rpc('get_business_balance_sheet', {
+    p_business_id: businessId, p_as_of: asOf || new Date().toISOString(),
+  });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
 module.exports = router;
