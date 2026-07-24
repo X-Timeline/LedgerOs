@@ -36,6 +36,7 @@ const navItems = [
 export default function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [shops, setShops] = useState([ALL_SHOPS]);
+  const [businessId, setBusinessId] = useState(null);
   const [selectedShop, setSelectedShop] = useState(ALL_SHOPS);
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   const [shopsLoading, setShopsLoading] = useState(true);
@@ -60,6 +61,7 @@ export default function AppShell() {
           return;
         }
         setShops([ALL_SHOPS, ...data]);
+        if (data[0]?.business_id) setBusinessId(data[0].business_id);
       })
       .catch((err) => {
         setShopsLoading(false);
@@ -233,7 +235,7 @@ export default function AppShell() {
         </header>
 
         <div className="flex-1">
-          <Outlet context={{ selectedShop, setSelectedShop }} />
+          <Outlet context={{ selectedShop, setSelectedShop, businessId }} />
         </div>
       </div>
 
@@ -258,5 +260,4 @@ export default function AppShell() {
       </nav>
     </div>
   );
-   }
-    
+}
