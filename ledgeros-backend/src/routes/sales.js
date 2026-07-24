@@ -35,17 +35,20 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(sale);
 });
 
-// GET /sales?shopId=... - list sales for a shop
+// GET /sales?shopId=... OR ?businessId=... - list sales
 router.get('/', requireAuth, async (req, res) => {
-  const { shopId } = req.query;
-  if (!shopId) return res.status(400).json({ error: 'shopId query param is required' });
+  const { shopId, businessId } = req.query;
+  if (!shopId && !businessId) {
+    return res.status(400).json({ error: 'shopId or businessId query param is required' });
+  }
 
   const db = getUserClient(req.userToken);
-  const { data, error } = await db
-    .from('sales')
-    .select('*, sale_lines(*), customers(name)')
-    .eq('shop_id', shopId)
-    .order('created_at', { ascending: false });
+
+  const query = shopId
+    ? db.from('sales').select('*, sale_lines(*), customers(name)').eq('shop_id', shopId)
+    : db.from('sales').select('*, sale_lines(*), customers(name), shops!inner(business_id)').eq('shops.business_id', businessId);
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
