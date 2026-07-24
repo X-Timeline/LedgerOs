@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Building2, Store, Plus, X, Check } from "lucide-react";
+import { api } from "../lib/api.js";
 
 const C = { primary: "#2563EB", success: "#22C55E", bg: "#F8FAFC", border: "#E2E8F0" };
 const currencies = ["NGN — Nigerian Naira (₦)", "GHS — Ghanaian Cedi (₵)", "KES — Kenyan Shilling (KSh)", "USD — US Dollar ($)"];
@@ -7,24 +8,74 @@ const currencies = ["NGN — Nigerian Naira (₦)", "GHS — Ghanaian Cedi (₵)
 export default function Settings() {
   const [tab, setTab] = useState("business");
   const [business, setBusiness] = useState({ name: "Chase Enterprise Ltd", currency: currencies[0] });
+  const [businessId, setBusinessId] = useState(null);
   const [saved, setSaved] = useState(false);
-  const [shops, setShops] = useState([
-    { id: "s1", name: "Chase Furniture", capital: 5000000 },
-    { id: "s2", name: "Chase Gadget", capital: 10000000 },
-  ]);
+  const [shops, setShops] = useState([]);
+  const [loadingShops, setLoadingShops] = useState(true);
   const [showAddShop, setShowAddShop] = useState(false);
-  const [newShop, setNewShop] = useState({ name: "", capital: "" });
+  const [newShop, setNewShop] = useState({ name: "" });
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
-  const saveBusiness = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+  // Load the real shop list from the backend
+  const loadShops = async () => {
+    setLoadingShops(true);
+    try {
+      const data = await api.get("/shops");
+      setShops(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingShops(false);
+    }
   };
 
-  const addShop = () => {
-    if (!newShop.name) return;
-    setShops((prev) => [...prev, { id: "s" + Date.now(), name: newShop.name, capital: Number(newShop.capital) || 0 }]);
-    setNewShop({ name: "", capital: "" });
-    setShowAddShop(false);
+  // Load the business this user owns, so we know which businessId to attach new shops to
+  const loadBusiness = async () => {
+    try {
+      const businesses = await api.get("/businesses");
+      if (businesses[0]) {
+        setBusiness({ name: businesses[0].name, currency: businesses[0].currency });
+        setBusinessId(businesses[0].id);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    loadBusiness();
+    loadShops();
+  }, []);
+
+  const saveBusiness = async () => {
+    if (!businessId) return;
+    try {
+      await api.patch(`/businesses/${businessId}`, { currency: business.currency });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const addShop = async () => {
+    if (!newShop.name || !businessId) return;
+    setCreating(true);
+    setError("");
+    try {
+      // Note: create_business_with_shop always creates a NEW business too.
+      // Since we already have a business, this should call a dedicated
+      // "add shop to existing business" endpoint instead. See note below.
+      await api.post("/shops", { businessId, name: newShop.name });
+      await loadShops();
+      setNewShop({ name: "" });
+      setShowAddShop(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -58,25 +109,32 @@ export default function Settings() {
 
         {tab === "shops" && (
           <div>
+            {error && (
+              <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+            )}
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs text-slate-500">{shops.length} shop{shops.length === 1 ? "" : "s"} under this business</p>
               <button onClick={() => setShowAddShop(true)} className="flex items-center gap-1.5 text-[11px] font-semibold text-white rounded-lg px-2.5 py-1.5" style={{ backgroundColor: C.primary }}>
                 <Plus size={12} /> Open Shop
               </button>
             </div>
-            <div className="space-y-2">
-              {shops.map((s) => (
-                <div key={s.id} className="flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
-                  <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${C.primary}12` }}>
-                      <Store size={15} style={{ color: C.primary }} />
-                    </span>
-                    <p className="text-[13.5px] font-semibold text-slate-900">{s.name}</p>
+            {loadingShops ? (
+              <p className="text-xs text-slate-400">Loading shops…</p>
+            ) : (
+              <div className="space-y-2">
+                {shops.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+                    <div className="flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${C.primary}12` }}>
+                        <Store size={15} style={{ color: C.primary }} />
+                      </span>
+                      <p className="text-[13.5px] font-semibold text-slate-900">{s.name}</p>
+                    </div>
+                    <span className="text-[12px] text-slate-400">Code: {s.shop_code}</span>
                   </div>
-                  <span className="text-[12px] text-slate-400">₦{s.capital.toLocaleString("en-NG")} capital</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {showAddShop && (
               <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -87,14 +145,9 @@ export default function Settings() {
                     <button onClick={() => setShowAddShop(false)}><X size={16} className="text-slate-400" /></button>
                   </div>
                   <label className="text-[11px] font-medium text-slate-500 block mb-1">Shop name</label>
-                  <input value={newShop.name} onChange={(e) => setNewShop({ ...newShop, name: e.target.value })} placeholder="e.g. Chase Electronics" className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none mb-3" style={{ borderColor: C.border }} />
-                  <label className="text-[11px] font-medium text-slate-500 block mb-1">Opening capital</label>
-                  <div className="relative mb-4">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">₦</span>
-                    <input type="number" value={newShop.capital} onChange={(e) => setNewShop({ ...newShop, capital: e.target.value })} placeholder="1,000,000" className="w-full rounded-xl border pl-7 pr-3.5 py-2.5 text-sm outline-none" style={{ borderColor: C.border }} />
-                  </div>
-                  <button onClick={addShop} className="w-full rounded-xl py-3 text-sm font-semibold text-white" style={{ backgroundColor: C.primary }}>
-                    Create Shop
+                  <input value={newShop.name} onChange={(e) => setNewShop({ ...newShop, name: e.target.value })} placeholder="e.g. Chase Electronics" className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none mb-4" style={{ borderColor: C.border }} />
+                  <button onClick={addShop} disabled={creating} className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: C.primary }}>
+                    {creating ? "Creating…" : "Create Shop"}
                   </button>
                 </div>
               </div>
