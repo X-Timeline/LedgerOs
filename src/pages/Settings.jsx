@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { Building2, Store, Plus, X, Check } from "lucide-react";
 import { api } from "../lib/api.js";
 
@@ -6,6 +7,8 @@ const C = { primary: "#2563EB", success: "#22C55E", bg: "#F8FAFC", border: "#E2E
 const currencies = ["NGN — Nigerian Naira (₦)", "GHS — Ghanaian Cedi (₵)", "KES — Kenyan Shilling (KSh)", "USD — US Dollar ($)"];
 
 export default function Settings() {
+  const { setSelectedShop } = useOutletContext();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("business");
   const [business, setBusiness] = useState({ name: "Chase Enterprise Ltd", currency: currencies[0] });
   const [businessId, setBusinessId] = useState(null);
@@ -123,7 +126,12 @@ export default function Settings() {
             ) : (
               <div className="space-y-2">
                 {shops.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+                  <button
+                    key={s.id}
+                    onClick={() => { setSelectedShop(s); navigate("/dashboard"); }}
+                    className="w-full flex items-center justify-between bg-white border rounded-2xl px-4 py-3.5 text-left hover:border-blue-300 hover:bg-blue-50/30"
+                    style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}
+                  >
                     <div className="flex items-center gap-3">
                       <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${C.primary}12` }}>
                         <Store size={15} style={{ color: C.primary }} />
@@ -131,7 +139,7 @@ export default function Settings() {
                       <p className="text-[13.5px] font-semibold text-slate-900">{s.name}</p>
                     </div>
                     <span className="text-[12px] text-slate-400">Code: {s.shop_code}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -157,4 +165,4 @@ export default function Settings() {
       </div>
     </div>
   );
-}
+                                 }
