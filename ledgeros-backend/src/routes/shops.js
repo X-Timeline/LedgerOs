@@ -4,6 +4,23 @@ const { getUserClient } = require('../config/supabaseClient');
 
 const router = express.Router();
 
+// POST /shops - add a new shop to an existing business (Owner/Admin only)
+// body: { businessId, name }
+router.post('/', requireAuth, async (req, res) => {
+  const { businessId, name } = req.body;
+  if (!businessId || !name) {
+    return res.status(400).json({ error: 'businessId and name are required' });
+  }
+
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db
+    .rpc('add_shop_to_business', { p_business_id: businessId, p_shop_name: name })
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(201).json(data); // { shop_id, shop_code }
+});
+
 // GET /shops - list every shop the logged-in user can access (RLS-scoped,
 // covers both business-wide roles like Owner and shop-scoped roles like Cashier)
 router.get('/', requireAuth, async (req, res) => {
@@ -45,3 +62,4 @@ router.get('/:id/members', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+            
