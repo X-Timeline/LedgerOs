@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingCart, FileText, Users, Truck, Package,
   ShoppingBag, Receipt, BarChart3, UserCog, Settings, HelpCircle,
-  Search, Bell, Menu, X, ChevronDown, Store, Layers, TrendingUp, Wallet, LogOut
+  Search, Bell, Menu, X, ChevronDown, Store, Layers, TrendingUp, Wallet, LogOut, AlertCircle
 } from "lucide-react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -38,16 +38,34 @@ export default function AppShell() {
   const [shops, setShops] = useState([ALL_SHOPS]);
   const [selectedShop, setSelectedShop] = useState(ALL_SHOPS);
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
+  const [shopsLoading, setShopsLoading] = useState(true);
+  const [shopsError, setShopsError] = useState("");
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
 
   useEffect(() => {
     if (!user) return;
+    setShopsLoading(true);
+    setShopsError("");
     api
       .get("/shops")
-      .then((data) => setShops([ALL_SHOPS, ...data]))
-      .catch(() => {}); // shop switcher just stays on "All Shops" if this fails
-  }, [user]);
+      .then((data) => {
+        setShopsLoading(false);
+        if (!data || data.length === 0) {
+          // A brand new account with no shop yet (e.g. confirmed by email
+          // link and landed here directly, skipping Onboarding) — send them
+          // to create one instead of showing a dashboard with nothing in it.
+          navigate("/onboarding", { replace: true });
+          return;
+        }
+        setShops([ALL_SHOPS, ...data]);
+      })
+      .catch((err) => {
+        setShopsLoading(false);
+        setShopsError(err.message);
+      });
+  }, [user, navigate]);
 
   return (
     <div className="min-h-screen w-full flex" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
@@ -68,15 +86,26 @@ export default function AppShell() {
         <div className="relative px-3 pt-3">
           <button
             onClick={() => setShopMenuOpen((v) => !v)}
-            className="w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left"
+            disabled={shopsLoading}
+            className="w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left disabled:opacity-60"
             style={{ borderColor: C.border }}
           >
             <span className="flex items-center gap-2 min-w-0">
               {selectedShop.id === "all" ? <Layers size={14} className="text-blue-500 shrink-0" /> : <Store size={14} className="text-blue-500 shrink-0" />}
-              <span className="text-[13px] font-semibold text-slate-900 truncate">{selectedShop.name}</span>
+              <span className="text-[13px] font-semibold text-slate-900 truncate">
+                {shopsLoading ? "Loading shops…" : selectedShop.name}
+              </span>
             </span>
             <ChevronDown size={14} className="text-slate-400 shrink-0" />
           </button>
+          {shopsError && (
+            <div className="flex items-start gap-1.5 mt-2 bg-red-50 border border-red-100 rounded-lg px-2.5 py-2">
+              <AlertCircle size={12} className="text-red-500 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-red-600 leading-snug">
+                Couldn't load shops: {shopsError}. If the backend was just deployed, it may still be waking up — try refreshing in a moment.
+              </p>
+            </div>
+          )}
           {shopMenuOpen && (
             <div className="absolute left-3 right-3 mt-1 bg-white border rounded-xl shadow-lg overflow-hidden z-20" style={{ borderColor: C.border }}>
               {shops.map((s) => (
