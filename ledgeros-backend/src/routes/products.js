@@ -61,19 +61,21 @@ router.post('/:id/units', requireAuth, async (req, res) => {
   res.status(201).json(data);
 });
 
-// GET /products?shopId=... - list all products for a shop, with their sell
-// units and purchase lots embedded so the frontend doesn't need N+1 requests
+// GET /products?shopId=... OR ?businessId=... - list products, with their
+// sell units and purchase lots embedded so the frontend doesn't need N+1 requests
 router.get('/', requireAuth, async (req, res) => {
-  const { shopId } = req.query;
-  if (!shopId) return res.status(400).json({ error: 'shopId query param is required' });
+  const { shopId, businessId } = req.query;
+  if (!shopId && !businessId) {
+    return res.status(400).json({ error: 'shopId or businessId query param is required' });
+  }
 
   const db = getUserClient(req.userToken);
 
-  const { data, error } = await db
-    .from('products')
-    .select('*, product_units(*), purchase_lots(*)')
-    .eq('shop_id', shopId)
-    .order('created_at', { ascending: false });
+  const query = shopId
+    ? db.from('products').select('*, product_units(*), purchase_lots(*)').eq('shop_id', shopId)
+    : db.from('products').select('*, product_units(*), purchase_lots(*), shops!inner(business_id)').eq('shops.business_id', businessId);
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
