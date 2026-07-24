@@ -90,8 +90,9 @@ function CustomTooltip({ active, payload, label }) {
 export default function Dashboard() {
   const [tab, setTab] = useState("stock");
   const navigate = useNavigate();
-  const { selectedShop } = useOutletContext();
-  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+  const { selectedShop, businessId } = useOutletContext();
+  const isAllShops = selectedShop?.id === "all";
+  const shopId = !isAllShops ? selectedShop?.id : null;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -107,18 +108,25 @@ export default function Dashboard() {
   ];
 
   const refresh = useCallback(() => {
-    if (!shopId) return;
+    if (isAllShops && !businessId) return;
+    if (!isAllShops && !shopId) return;
+
     setLoading(true);
     const now = new Date().toISOString();
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
+    const start = startOfToday.toISOString();
+
+    const scopeParam = isAllShops ? `businessId=${businessId}` : `shopId=${shopId}`;
+    const prefix = isAllShops ? '/reports/business' : '/reports';
+    const bsQuery = isAllShops ? `${scopeParam}&asOf=${now}` : `${scopeParam}&asOf=${now}`;
 
     Promise.all([
-      api.get(`/reports/trading-account?shopId=${shopId}&start=${startOfToday.toISOString()}&end=${now}`),
-      api.get(`/reports/profit-and-loss?shopId=${shopId}&start=${startOfToday.toISOString()}&end=${now}`),
-      api.get(`/reports/balance-sheet?shopId=${shopId}&asOf=${now}`),
-      api.get(`/products?shopId=${shopId}`),
-      api.get(`/sales?shopId=${shopId}`),
+      api.get(`${prefix}/trading-account?${scopeParam}&start=${start}&end=${now}`),
+      api.get(`${prefix}/profit-and-loss?${scopeParam}&start=${start}&end=${now}`),
+      api.get(`${prefix}/balance-sheet?${bsQuery}`),
+      api.get(`/products?${scopeParam}`),
+      api.get(`/sales?${scopeParam}`),
     ])
       .then(([tradingData, pnlData, bsData, productsData, salesData]) => {
         setLoading(false);
@@ -132,16 +140,14 @@ export default function Dashboard() {
         setLoading(false);
         setError(err.message);
       });
-  }, [shopId]);
+  }, [shopId, isAllShops, businessId]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  if (!shopId) {
+  if (isAllShops && !businessId) {
     return (
       <div className="w-full flex items-center justify-center py-24 px-4">
-        <p className="text-sm text-slate-400 text-center max-w-xs">
-          Select a specific shop from the switcher above — the business-wide "All Shops" dashboard isn't wired to live numbers yet.
-        </p>
+        <p className="text-sm text-slate-400">Loading business data…</p>
       </div>
     );
   }
@@ -199,7 +205,9 @@ export default function Dashboard() {
           <GraphPaper className="absolute inset-0 pointer-events-none" />
           <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
             <div>
-              <p className="text-blue-100 text-[13px] font-medium">Here's {selectedShop.name} today</p>
+              <p className="text-blue-100 text-[13px] font-medium">
+                {isAllShops ? "Here's your business today (all shops combined)" : `Here's ${selectedShop.name} today`}
+              </p>
               <p className="mt-1 text-white text-3xl lg:text-4xl font-semibold tabular-nums tracking-tight">
                 {naira(trading.totalSales)}
                 <span className="text-blue-200 text-base font-medium ml-2">sold so far</span>
