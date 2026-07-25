@@ -136,9 +136,11 @@ export default function POS() {
         return prev.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i));
       }
       if (max <= 0) return prev;
+      const unitInfo = unitsFor(product).find((u) => u.name === unitName);
+      const suggestedPrice = product.default_price ? Number(product.default_price) * (unitInfo?.conversion || 1) : 0;
       return [
         ...prev,
-        { key, productId: product.id, name: product.name, unit: unitName, price: 0, qty: 1, maxQty: max },
+        { key, productId: product.id, name: product.name, unit: unitName, price: Math.round(suggestedPrice), qty: 1, maxQty: max },
       ];
     });
     setUnitPicker(null);
@@ -477,8 +479,4 @@ export default function POS() {
         </div>
       </div>
 
-      {/* ---------- Cart: mobile modal — only opens when a good is added ---------- */}
-      {cartOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setCartOpen(false)} />
-  
+      {/* ---------- Cart: mobile modal — only opens when a go
