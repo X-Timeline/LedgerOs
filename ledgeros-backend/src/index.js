@@ -15,6 +15,7 @@ const expensesRoutes = require('./routes/expenses');
 const customersRoutes = require('./routes/customers');
 const suppliersRoutes = require('./routes/suppliers');
 const reportsRoutes = require('./routes/reports');
+const invoicesRoutes = require('./routes/invoices');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -35,6 +36,7 @@ app.use('/expenses', expensesRoutes);
 app.use('/customers', customersRoutes);
 app.use('/suppliers', suppliersRoutes);
 app.use('/reports', reportsRoutes);
+app.use('/invoices', invoicesRoutes);
 
 app.listen(PORT, () => {
   console.log(`LedgerOS backend running at http://localhost:${PORT}`);
