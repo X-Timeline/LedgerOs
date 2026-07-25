@@ -39,6 +39,10 @@ export default function Inventory() {
   const [saving, setSaving] = useState(false);
 
   const [purchase, setPurchase] = useState({ productId: "", qty: "", cost: "", channel: "cash" });
+  const [returnModal, setReturnModal] = useState(null); // the lot being returned
+  const [returnQty, setReturnQty] = useState("");
+  const [returnReason, setReturnReason] = useState("");
+  const [savingReturn, setSavingReturn] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: "", baseUnit: "carton", costingMethod: "FIFO",
     sellUnits: [{ name: "", factor: "" }],
@@ -60,6 +64,27 @@ export default function Inventory() {
   }, [shopId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const submitPurchaseReturn = async () => {
+    if (!returnModal || !returnQty) return;
+    setSavingReturn(true);
+    setError("");
+    try {
+      await api.post("/returns/purchase", {
+        purchaseLotId: returnModal.id,
+        quantityReturned: Number(returnQty),
+        reason: returnReason || undefined,
+      });
+      await refresh();
+      setReturnModal(null);
+      setReturnQty("");
+      setReturnReason("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingReturn(false);
+    }
+  };
 
   const addLot = async () => {
     if (!purchase.productId || !purchase.qty || !purchase.cost) return;
@@ -217,7 +242,17 @@ export default function Inventory() {
                               <Layers size={12} /> {new Date(l.purchase_date).toISOString().slice(0, 10)} · {l.remaining_quantity}/{l.quantity} left
                               {l.channel === "CASH" ? <Banknote size={11} className="text-slate-300" /> : <Landmark size={11} className="text-slate-300" />}
                             </span>
-                            <span className="font-medium tabular-nums text-slate-700">{naira(l.total_cost)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium tabular-nums text-slate-700">{naira(l.total_cost)}</span>
+                              {Number(l.remaining_quantity) > 0 && (
+                                <button
+                                  onClick={() => setReturnModal(l)}
+                                  className="text-[10px] font-semibold text-red-600 border border-red-200 rounded-full px-2 py-0.5"
+                                >
+                                  Return
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       {(p.purchase_lots || []).length === 0 && (
@@ -401,7 +436,9 @@ export default function Inventory() {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
+
+        {/* ---------- Return stock to supplier modal ---------- */}
+        {returnModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-slate-900/40" onClick={() => setReturnModal(null)} />
+            <div className="relative w-ful
