@@ -1,158 +1,333 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Wallet, Package, ShoppingCart, TrendingUp, ArrowRight, PlayCircle,
-  Sparkles, ShieldCheck, Smartphone, LineChart
-} from "lucide-react";
+import { PlayCircle } from "lucide-react";
 
-const C = {
-  primary: "#2563EB",
-  primaryDark: "#1D4ED8",
-  success: "#22C55E",
-  warning: "#F59E0B",
-  bg: "#F8FAFC",
-  textSub: "#64748B",
-  border: "#E2E8F0",
+// ---------------------------------------------------------------
+// Design direction: LedgerOS is a digital ledger — so the landing
+// page IS a ledger: a bound cover on the left, an open ruled page
+// on the right with a real worked example, tabbed index sections
+// for each module (Purchases, Sales, Cash Book, Debtors, Reports),
+// and a wax/ink-stamp call to action instead of a gradient pill
+// button. No floating icon cards, no centered hero, no blue-gradient
+// SaaS template.
+// ---------------------------------------------------------------
+
+const T = {
+  cover: "#1C3A2E",      // ledger cloth cover, deep bottle green
+  coverDark: "#122720",  // shadow/spine side of the cover
+  paper: "#F1E9D2",      // aged ledger page
+  paperLine: "rgba(28,58,46,0.13)", // ruled line on the page
+  ink: "#211D16",        // main text ink
+  red: "#7C2A28",        // ledger red ink (debit/stamp)
+  brass: "#B08A46",      // brass/gilt accent
+  brassLight: "#D9C08B",
 };
 
-const GraphPaper = ({ className = "" }) => (
-  <svg className={className} width="100%" height="100%" preserveAspectRatio="none">
-    <defs>
-      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
-        <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#grid)" />
-  </svg>
-);
+const display = { fontFamily: "'Fraunces', serif" };
+const body = { fontFamily: "'Source Serif 4', serif" };
+const mono = { fontFamily: "'IBM Plex Mono', monospace" };
 
-function FlowCard({ icon: Icon, label, value, sub, accent, i, floatDelay }) {
-  return (
-    <div
-      className="rounded-2xl bg-white px-4 py-3.5 shadow-xl w-40 opacity-0"
-      style={{
-        animation: `fadeUp 500ms ease-out ${i * 150}ms forwards, float 4s ease-in-out ${floatDelay}s infinite`,
-      }}
-    >
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${accent}16` }}>
-          <Icon size={14} style={{ color: accent }} />
-        </span>
-        <span className="text-[11px] font-medium text-slate-500">{label}</span>
-      </div>
-      <p className="text-sm font-semibold text-slate-900 tabular-nums">{value}</p>
-      {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
+// A worked example straight out of the product's own accounting model —
+// this doubles as the demo, instead of marketing copy.
+const ledgerRows = [
+  { date: "03 Jul", particulars: "Capital brought in", debit: "", credit: "1,000,000", balance: "1,000,000" },
+  { date: "04 Jul", particulars: "Bought Golden Morn — 5 cartons", debit: "75,000", credit: "", balance: "925,000" },
+  { date: "06 Jul", particulars: "Sold 2 cartons, cash", debit: "", credit: "40,000", balance: "965,000" },
+  { date: "06 Jul", particulars: "Sold 1 carton, on credit — Mrs Adeyemi", debit: "", credit: "20,000*", balance: "985,000" },
+];
+
+const modules = [
+  {
+    tag: "I",
+    label: "Purchases & Stock",
+    body: "Every batch keeps its own cost. FIFO, LIFO, or weighted average — set per product, applied automatically on every sale.",
+  },
+  {
+    tag: "II",
+    label: "Sales (POS)",
+    body: "Ring up a sale in seconds. Cash, transfer, or credit — profit is worked out the moment the sale is completed, never guessed.",
+  },
+  {
+    tag: "III",
+    label: "Cash Book",
+    body: "Cash and bank are kept apart and reconciled continuously, down to the last transfer between them.",
+  },
+  {
+    tag: "IV",
+    label: "Debtors & Suppliers",
+    body: "Know exactly who owes you, and who you owe, at any moment — not just at month end.",
+  },
+  {
+    tag: "V",
+    label: "Reports",
+    body: "Trading account, profit & loss, balance sheet — read live from your books, never a stale export.",
+  },
+];
 
 export default function Landing() {
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [activeModule, setActiveModule] = useState(0);
 
-  const steps = [
-    { icon: Wallet, label: "Capital In", value: "₦1,000,000", sub: "Opening balance", accent: C.primary },
-    { icon: Package, label: "Stock Bought", value: "5 cartons", sub: "Golden Morn · ₦15,000", accent: C.warning },
-    { icon: ShoppingCart, label: "Sale Made", value: "₦8,000", sub: "1 carton sold", accent: C.primary },
-    { icon: TrendingUp, label: "Profit", value: "+₦3,400", sub: "Calculated for you", accent: C.success },
-  ];
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }}>
+    <div style={{ backgroundColor: T.paper, fontFamily: "'Source Serif 4', serif" }} className="min-h-screen w-full">
       <style>{`
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes coverIn {
+          from { opacity: 0; transform: translateX(-18px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pageIn {
+          from { opacity: 0; transform: translateX(18px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes rowIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .stamp-btn { transition: transform 160ms ease, box-shadow 160ms ease; }
+        .stamp-btn:hover { transform: rotate(-4deg) scale(1.04); }
+        .stamp-btn:active { transform: rotate(-2deg) scale(0.97); }
+        a:focus-visible, button:focus-visible {
+          outline: 2px solid ${T.brass};
+          outline-offset: 3px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .anim-cover, .anim-page, .anim-row { animation: none !important; opacity: 1 !important; transform: none !important; }
+        }
       `}</style>
 
-      {/* ---------- Hero ---------- */}
-      <div className="relative overflow-hidden" style={{ background: `linear-gradient(155deg, ${C.primaryDark}, ${C.primary} 55%, #3B82F6)` }}>
-        <GraphPaper className="absolute inset-0 pointer-events-none" />
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
+      {/* hidden SVG filter: gives the ink stamp a rough, non-vector edge */}
+      <svg width="0" height="0" style={{ position: "absolute" }}>
+        <filter id="stampRough">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.5" />
+        </filter>
+      </svg>
 
-        <div className="relative max-w-6xl mx-auto px-5 lg:px-8 pt-8 pb-16 lg:pt-10 lg:pb-24">
-          <div className="flex items-center gap-2 mb-14">
-            <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
-              <span className="text-blue-600 text-xs font-bold">L</span>
-            </div>
-            <span className="text-white font-semibold text-[15px]">LedgerOS</span>
+      {/* =============== HERO: the open ledger book =============== */}
+      <div className="relative w-full overflow-hidden" style={{ backgroundColor: T.coverDark }}>
+        <div className="max-w-5xl mx-auto px-4 lg:px-6">
+          {/* top wordmark, sits above the "book" like a shelf label */}
+          <div className="flex items-center justify-between pt-6 pb-5">
+            <span style={{ ...display, color: T.brassLight, letterSpacing: "0.02em" }} className="text-[15px] font-semibold">
+              LedgerOS
+            </span>
+            <button
+              onClick={() => navigate("/login")}
+              style={{ ...body, color: T.brassLight }}
+              className="text-[13px] underline decoration-dotted underline-offset-4 hover:text-white"
+            >
+              Sign in
+            </button>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-100 bg-white/10 border border-white/15 rounded-full px-3 py-1 mb-5">
-                <Sparkles size={12} /> Built for African SMEs
-              </span>
-              <h1 className="text-3xl lg:text-[2.75rem] font-semibold text-white leading-[1.1] tracking-tight">
-                Run your business from anywhere.
-              </h1>
-              <p className="mt-4 text-blue-100 text-[15px] leading-relaxed max-w-md">
-                Log a purchase, make a sale — LedgerOS handles the calculations, tracks your stock,
-                and keeps your books, so you never lose an account book again.
+          {/* the book itself: cover (left) + open page (right) + spine */}
+          <div className="relative grid lg:grid-cols-[1fr_auto_1.15fr] rounded-t-lg overflow-hidden shadow-2xl">
+            {/* left: cloth cover */}
+            <div
+              className={`relative px-7 py-10 lg:py-14 flex flex-col justify-center ${mounted ? "anim-cover" : "opacity-0"}`}
+              style={{
+                backgroundColor: T.cover,
+                backgroundImage: `
+                  repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 5px),
+                  repeating-linear-gradient(-45deg, rgba(0,0,0,0.03) 0 2px, transparent 2px 5px),
+                  linear-gradient(160deg, rgba(255,255,255,0.06), transparent 40%)
+                `,
+                animation: mounted ? "coverIn 620ms cubic-bezier(.2,.7,.2,1) both" : "none",
+              }}
+            >
+              <p style={{ ...mono, color: T.brassLight }} className="text-[10.5px] tracking-[0.22em] uppercase mb-4 opacity-80">
+                Trade &amp; Household Accounts
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <button onClick={() => navigate("/signup")} className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3.5 hover:bg-blue-50">
-                  Get Started <ArrowRight size={16} />
+              <h1 style={{ ...display, color: "#F4EFDF" }} className="text-[2.1rem] lg:text-[2.6rem] leading-[1.06] font-semibold">
+                The book that balances itself.
+              </h1>
+              <p style={{ ...body, color: "rgba(244,239,223,0.78)" }} className="mt-5 text-[15px] leading-relaxed max-w-sm">
+                Log what you bought, log what you sold. LedgerOS keeps the cost, the cash,
+                and the profit — correct, every time, without a calculator in sight.
+              </p>
+
+              <div className="mt-8 flex flex-wrap items-center gap-5">
+                <button
+                  onClick={() => navigate("/signup")}
+                  className="stamp-btn relative flex items-center justify-center"
+                  style={{
+                    width: 156, height: 156,
+                    border: `3px double ${T.brassLight}`,
+                    borderRadius: "50%",
+                    filter: "url(#stampRough)",
+                    transform: "rotate(-6deg)",
+                    background: "transparent",
+                  }}
+                >
+                  <span style={{ ...display, color: T.brassLight }} className="text-[13px] font-semibold tracking-[0.12em] uppercase leading-tight text-center px-3">
+                    Open an
+                    <br />
+                    Account
+                  </span>
                 </button>
-                <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 border border-white/40 text-white font-semibold text-sm rounded-xl px-5 py-3.5 hover:bg-white/10">
-                  <PlayCircle size={17} /> Try the Tutorial
+                <button
+                  onClick={() => navigate("/tutorial")}
+                  style={{ ...body, color: T.brassLight }}
+                  className="flex items-center gap-1.5 text-[13.5px] hover:text-white"
+                >
+                  <PlayCircle size={16} /> See a filled ledger
                 </button>
               </div>
-              <p className="mt-4 text-[12px] text-blue-200">No card required · Tutorial uses sample data only</p>
             </div>
 
-            {/* Illustrated flow: Capital -> Stock -> Sale -> Profit */}
-            <div className="relative h-[360px] hidden sm:block">
-              <div className="absolute inset-0" style={{
-                backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,0.25) 0 8px, transparent 8px 16px)",
-                height: 2, top: "50%",
-              }} />
-              {mounted && (
-                <>
-                  <div className="absolute top-6 left-2"><FlowCard {...steps[0]} i={0} floatDelay={0} /></div>
-                  <div className="absolute top-32 left-40"><FlowCard {...steps[1]} i={1} floatDelay={0.6} /></div>
-                  <div className="absolute top-4 right-8"><FlowCard {...steps[2]} i={2} floatDelay={1.1} /></div>
-                  <div className="absolute bottom-4 right-24"><FlowCard {...steps[3]} i={3} floatDelay={1.6} /></div>
-                </>
-              )}
-              <ArrowRight size={20} className="absolute top-[46%] left-[36%] text-white/50 rotate-12" />
-              <ArrowRight size={20} className="absolute top-[30%] left-[68%] text-white/50 -rotate-12" />
-              <ArrowRight size={20} className="absolute top-[62%] left-[80%] text-white/50 rotate-45" />
+            {/* spine / binding */}
+            <div
+              className="hidden lg:block relative w-6"
+              style={{
+                background: `linear-gradient(90deg, ${T.coverDark}, #0B1712 50%, ${T.coverDark})`,
+              }}
+            >
+              <div
+                className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px]"
+                style={{
+                  backgroundImage: `repeating-linear-gradient(to bottom, ${T.brass} 0 4px, transparent 4px 11px)`,
+                }}
+              />
+            </div>
+
+            {/* right: open ruled page with the worked example */}
+            <div
+              className={`relative px-6 py-8 lg:py-12 lg:px-9 ${mounted ? "anim-page" : "opacity-0"}`}
+              style={{
+                backgroundColor: T.paper,
+                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 31px, ${T.paperLine} 31px 32px)`,
+                animation: mounted ? "pageIn 620ms 120ms cubic-bezier(.2,.7,.2,1) both" : "none",
+              }}
+            >
+              <p style={{ ...mono, color: T.red }} className="text-[10.5px] tracking-[0.18em] uppercase mb-3">
+                Ledger No. 1 — Specimen Entry
+              </p>
+
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr style={{ color: T.ink }} className="text-left">
+                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 w-[52px]">Date</th>
+                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2">Particulars</th>
+                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 text-right w-[70px]">Debit</th>
+                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 text-right w-[70px]">Credit</th>
+                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 text-right w-[78px]">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerRows.map((r, i) => (
+                    <tr
+                      key={i}
+                      className={mounted ? "anim-row" : "opacity-0"}
+                      style={{ animation: mounted ? `rowIn 420ms ${260 + i * 120}ms both` : "none" }}
+                    >
+                      <td style={{ ...mono, color: T.ink }} className="text-[11.5px] py-2 align-top opacity-70">{r.date}</td>
+                      <td style={{ ...body, color: T.ink }} className="text-[12.5px] py-2 align-top pr-2">{r.particulars}</td>
+                      <td style={{ ...mono, color: T.red }} className="text-[12px] py-2 align-top text-right">{r.debit}</td>
+                      <td style={{ ...mono, color: T.cover }} className="text-[12px] py-2 align-top text-right">{r.credit}</td>
+                      <td style={{ ...mono, color: T.ink }} className="text-[12px] py-2 align-top text-right font-medium">{r.balance}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={5} style={{ borderTop: `1px solid ${T.ink}` }} className="pt-2">
+                      <div className="flex items-baseline justify-between">
+                        <span style={{ ...body, color: T.ink }} className="text-[11.5px] italic opacity-70">
+                          * owed by customer, not yet received
+                        </span>
+                        <span style={{ ...mono, color: T.ink }} className="text-[12px] font-semibold">
+                          Gross profit&nbsp;&nbsp;₦15,000
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ---------- Why LedgerOS ---------- */}
-      <div className="max-w-6xl mx-auto px-5 lg:px-8 py-14 lg:py-20">
-        <h2 className="text-xl font-semibold text-slate-900 text-center mb-2">No more notebooks, no more guesswork</h2>
-        <p className="text-sm text-slate-500 text-center max-w-lg mx-auto mb-10">
-          Every sale, purchase, and cedi in or out is recorded automatically — so your accounts
-          are always current, and never lost.
+      {/* =============== MODULE INDEX (ledger tabs) =============== */}
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-16 lg:py-20">
+        <p style={{ ...mono, color: T.red }} className="text-[10.5px] tracking-[0.2em] uppercase mb-2">
+          Index
         </p>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            { icon: LineChart, title: "Profit, calculated for you", body: "Cost tracked per batch, profit worked out on every sale — no manual math." },
-            { icon: ShieldCheck, title: "Cash & bank, never confused", body: "A two-column cash book keeps cash-in-hand and bank balance always accurate." },
-            { icon: Smartphone, title: "Install it like an app", body: "Works as a PWA on any phone — no app store, no heavy download." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-2xl bg-white border p-5" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${C.primary}12` }}>
-                <f.icon size={17} style={{ color: C.primary }} />
-              </span>
-              <h3 className="text-[13.5px] font-semibold text-slate-900 mb-1">{f.title}</h3>
-              <p className="text-[13px] text-slate-500 leading-relaxed">{f.body}</p>
-            </div>
-          ))}
-        </div>
+        <h2 style={{ ...display, color: T.ink }} className="text-[1.6rem] font-semibold mb-8">
+          Five sections. One set of books.
+        </h2>
 
-        <div className="mt-10 flex items-center justify-center gap-3">
-          <button onClick={() => navigate("/signup")} className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
-            Create your business <ArrowRight size={16} />
+        <div className="grid lg:grid-cols-[240px_1fr] gap-0 border" style={{ borderColor: "rgba(28,58,46,0.25)" }}>
+          {/* tab column */}
+          <div className="flex lg:flex-col overflow-x-auto lg:overflow-visible">
+            {modules.map((m, i) => (
+              <button
+                key={m.label}
+                onClick={() => setActiveModule(i)}
+                className="relative text-left px-4 py-3.5 shrink-0 lg:shrink border-b lg:border-b lg:last:border-b-0"
+                style={{
+                  borderColor: "rgba(28,58,46,0.18)",
+                  backgroundColor: activeModule === i ? T.paper : "transparent",
+                  borderLeft: activeModule === i ? `3px solid ${T.red}` : "3px solid transparent",
+                }}
+              >
+                <span style={{ ...mono, color: T.red }} className="text-[10px] mr-2">{m.tag}</span>
+                <span style={{ ...body, color: T.ink }} className="text-[13.5px] font-medium">{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* open page for the active tab */}
+          <div
+            className="px-6 py-8 lg:px-10 lg:py-10"
+            style={{
+              backgroundColor: T.paper,
+              backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 30px, ${T.paperLine} 30px 31px)`,
+            }}
+          >
+            <h3 style={{ ...display, color: T.ink }} className="text-[1.3rem] font-semibold mb-3">
+              {modules[activeModule].label}
+            </h3>
+            <p style={{ ...body, color: T.ink }} className="text-[14.5px] leading-relaxed max-w-md opacity-85">
+              {modules[activeModule].body}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* =============== CLOSING =============== */}
+      <div style={{ backgroundColor: T.cover }} className="w-full">
+        <div className="max-w-5xl mx-auto px-4 lg:px-6 py-16 lg:py-20 flex flex-col items-center text-center">
+          <p style={{ ...mono, color: T.brassLight }} className="text-[11px] tracking-[0.2em] uppercase mb-3 opacity-80">
+            Brought forward · Carried forward · Never lost
+          </p>
+          <h2 style={{ ...display, color: "#F4EFDF" }} className="text-[1.7rem] lg:text-[2rem] font-semibold max-w-lg leading-snug mb-8">
+            Start the ledger your business already deserves.
+          </h2>
+          <button
+            onClick={() => navigate("/signup")}
+            className="stamp-btn relative flex items-center justify-center"
+            style={{
+              width: 148, height: 148,
+              border: `3px double ${T.brassLight}`,
+              borderRadius: "50%",
+              filter: "url(#stampRough)",
+              transform: "rotate(4deg)",
+            }}
+          >
+            <span style={{ ...display, color: T.brassLight }} className="text-[12.5px] font-semibold tracking-[0.12em] uppercase leading-tight text-center px-3">
+              Open an
+              <br />
+              Account
+            </span>
           </button>
-          <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 text-slate-600 font-medium text-sm rounded-xl px-5 py-3 border" style={{ borderColor: C.border }}>
-            <PlayCircle size={16} /> Explore the tutorial first
-          </button>
+          <p style={{ ...body, color: "rgba(244,239,223,0.6)" }} className="text-[12px] mt-6">
+            No card required · Tutorial uses sample data only
+          </p>
         </div>
       </div>
     </div>
