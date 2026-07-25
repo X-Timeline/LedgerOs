@@ -5,9 +5,9 @@ const { getUserClient } = require('../config/supabaseClient');
 const router = express.Router();
 
 // POST /sales - create a sale (runs the costing engine server-side)
-// body: { shopId, customerId, channel, status, lines: [{productId, unitSold, quantity, unitPrice}] }
+// body: { shopId, customerId, channel, status, discountAmount, lines: [{productId, unitSold, quantity, unitPrice}] }
 router.post('/', requireAuth, async (req, res) => {
-  const { shopId, customerId, channel, status, lines } = req.body;
+  const { shopId, customerId, channel, status, discountAmount, lines } = req.body;
 
   if (!shopId || !channel || !Array.isArray(lines) || lines.length === 0) {
     return res.status(400).json({ error: 'shopId, channel and at least one line are required' });
@@ -21,6 +21,7 @@ router.post('/', requireAuth, async (req, res) => {
     p_channel: channel,
     p_lines: lines,
     p_status: status || 'COMPLETE',
+    p_discount_amount: discountAmount || 0,
   });
 
   if (error) return res.status(400).json({ error: error.message });
