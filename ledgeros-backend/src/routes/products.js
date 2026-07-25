@@ -5,9 +5,9 @@ const { getUserClient } = require('../config/supabaseClient');
 const router = express.Router();
 
 // POST /products - add a new product to a shop
-// body: { shopId, name, baseUnit, costingMethod, sellUnits?: [{ name, conversionToBase }] }
+// body: { shopId, name, baseUnit, costingMethod, defaultPrice?, sellUnits?: [{ name, conversionToBase }] }
 router.post('/', requireAuth, async (req, res) => {
-  const { shopId, name, baseUnit, costingMethod, sellUnits } = req.body;
+  const { shopId, name, baseUnit, costingMethod, defaultPrice, sellUnits } = req.body;
 
   if (!shopId || !name || !baseUnit) {
     return res.status(400).json({ error: 'shopId, name and baseUnit are required' });
@@ -22,6 +22,7 @@ router.post('/', requireAuth, async (req, res) => {
       name,
       base_unit: baseUnit,
       costing_method: costingMethod || 'FIFO',
+      default_price: defaultPrice || null,
     })
     .select()
     .single();
@@ -40,6 +41,47 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   res.status(201).json(product);
+});
+
+// PATCH /products/:id - edit a product (e.g. change its selling price)
+// body: any of { name, baseUnit, costingMethod, defaultPrice }
+router.patch('/:id', requireAuth, async (req, res) => {
+  const { name, baseUnit, costingMethod, defaultPrice } = req.body;
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (baseUnit !== undefined) updates.base_unit = baseUnit;
+  if (costingMethod !== undefined) updates.costing_method = costingMethod;
+  if (defaultPrice !== undefined) updates.default_price = defaultPrice;
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No fields to update were provided' });
+  }
+
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db
+    .from('products')
+    .update(updates)
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+// GET /products/:id/audit-log - history of changes made to this product
+// (who changed what, and when — e.g. price changes)
+router.get('/:id/audit-log', requireAuth, async (req, res) => {
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db
+    .from('audit_logs')
+    .select('*')
+    .eq('entity', 'product')
+    .eq('entity_id', req.params.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 // POST /products/:id/units - add a sell-unit conversion to an existing product
