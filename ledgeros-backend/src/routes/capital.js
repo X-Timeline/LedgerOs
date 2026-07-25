@@ -22,17 +22,20 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(data);
 });
 
-// GET /capital?shopId=...
+// GET /capital?shopId=... OR ?businessId=...
 router.get('/', requireAuth, async (req, res) => {
-  const { shopId } = req.query;
-  if (!shopId) return res.status(400).json({ error: 'shopId query param is required' });
+  const { shopId, businessId } = req.query;
+  if (!shopId && !businessId) {
+    return res.status(400).json({ error: 'shopId or businessId query param is required' });
+  }
 
   const db = getUserClient(req.userToken);
-  const { data, error } = await db
-    .from('capital_entries')
-    .select('*')
-    .eq('shop_id', shopId)
-    .order('date', { ascending: false });
+
+  const query = shopId
+    ? db.from('capital_entries').select('*').eq('shop_id', shopId)
+    : db.from('capital_entries').select('*, shops!inner(business_id)').eq('shops.business_id', businessId);
+
+  const { data, error } = await query.order('date', { ascending: false });
 
   if (error) return res.status(400).json({ error: error.message });
   res.json(data);
