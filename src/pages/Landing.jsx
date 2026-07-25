@@ -1,333 +1,193 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PlayCircle } from "lucide-react";
+import {
+  ArrowRight, PlayCircle, Package, ShoppingCart, Wallet, BarChart3,
+  Users, CheckCircle2
+} from "lucide-react";
 
-// ---------------------------------------------------------------
-// Design direction: LedgerOS is a digital ledger — so the landing
-// page IS a ledger: a bound cover on the left, an open ruled page
-// on the right with a real worked example, tabbed index sections
-// for each module (Purchases, Sales, Cash Book, Debtors, Reports),
-// and a wax/ink-stamp call to action instead of a gradient pill
-// button. No floating icon cards, no centered hero, no blue-gradient
-// SaaS template.
-// ---------------------------------------------------------------
+// Design direction: same materials as the rest of the app (Inter, light
+// background, rounded-2xl white cards, blue primary, the graph-paper
+// texture already used on Dashboard's hero) — but the content stays
+// product-specific rather than generic: a real worked ledger example
+// instead of marketing copy, and the actual five modules instead of
+// abstract "features."
 
-const T = {
-  cover: "#132A54",      // ledger cover, deep navy — same family as the app's primary blue
-  coverDark: "#0A1730",  // shadow/spine side of the cover
-  paper: "#F8F6F1",      // soft, barely-warm page — reads as "paper" without clashing with app white
-  paperLine: "rgba(19,42,84,0.10)", // ruled line on the page, blue-tinted to match
-  ink: "#0F172A",        // matches the app's C.dark exactly, ties typography straight to the rest of the app
-  red: "#B42318",        // ledger red ink (debit)
-  brass: "#2563EB",      // was a brass/gilt accent — now the app's actual primary blue
-  brassLight: "#93C5FD", // light blue for text on dark backgrounds (tailwind blue-300)
+const C = {
+  primary: "#2563EB",
+  primaryDark: "#1D4ED8",
+  success: "#22C55E",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  bg: "#F8FAFC",
+  border: "#E2E8F0",
+  dark: "#0F172A",
+  textSub: "#64748B",
 };
 
-const display = { fontFamily: "'Fraunces', serif" };
-const body = { fontFamily: "'Source Serif 4', serif" };
-const mono = { fontFamily: "'IBM Plex Mono', monospace" };
+const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
 
-// A worked example straight out of the product's own accounting model —
-// this doubles as the demo, instead of marketing copy.
 const ledgerRows = [
-  { date: "03 Jul", particulars: "Capital brought in", debit: "", credit: "1,000,000", balance: "1,000,000" },
-  { date: "04 Jul", particulars: "Bought Golden Morn — 5 cartons", debit: "75,000", credit: "", balance: "925,000" },
-  { date: "06 Jul", particulars: "Sold 2 cartons, cash", debit: "", credit: "40,000", balance: "965,000" },
-  { date: "06 Jul", particulars: "Sold 1 carton, on credit — Mrs Adeyemi", debit: "", credit: "20,000*", balance: "985,000" },
+  { date: "03 Jul", particulars: "Capital brought in", debit: null, credit: 1000000, balance: 1000000 },
+  { date: "04 Jul", particulars: "Bought Golden Morn — 5 cartons", debit: 75000, credit: null, balance: 925000 },
+  { date: "06 Jul", particulars: "Sold 2 cartons, cash", debit: null, credit: 40000, balance: 965000 },
+  { date: "06 Jul", particulars: "Sold 1 carton, on credit — Mrs Adeyemi", debit: null, credit: 20000, balance: 985000, note: true },
 ];
 
 const modules = [
-  {
-    tag: "I",
-    label: "Purchases & Stock",
-    body: "Every batch keeps its own cost. FIFO, LIFO, or weighted average — set per product, applied automatically on every sale.",
-  },
-  {
-    tag: "II",
-    label: "Sales (POS)",
-    body: "Ring up a sale in seconds. Cash, transfer, or credit — profit is worked out the moment the sale is completed, never guessed.",
-  },
-  {
-    tag: "III",
-    label: "Cash Book",
-    body: "Cash and bank are kept apart and reconciled continuously, down to the last transfer between them.",
-  },
-  {
-    tag: "IV",
-    label: "Debtors & Suppliers",
-    body: "Know exactly who owes you, and who you owe, at any moment — not just at month end.",
-  },
-  {
-    tag: "V",
-    label: "Reports",
-    body: "Trading account, profit & loss, balance sheet — read live from your books, never a stale export.",
-  },
+  { key: "stock", icon: Package, label: "Purchases & Stock", body: "Every batch keeps its own cost. FIFO, LIFO, or weighted average — set per product, applied automatically on every sale." },
+  { key: "sales", icon: ShoppingCart, label: "Sales (POS)", body: "Ring up a sale in seconds. Cash, transfer, or credit — profit is worked out the moment the sale is completed, never guessed." },
+  { key: "cash", icon: Wallet, label: "Cash Book", body: "Cash and bank are kept apart and reconciled continuously, down to the last transfer between them." },
+  { key: "debtors", icon: Users, label: "Debtors & Suppliers", body: "Know exactly who owes you, and who you owe, at any moment — not just at month end." },
+  { key: "reports", icon: BarChart3, label: "Reports", body: "Trading account, profit & loss, balance sheet — read live from your books, never a stale export." },
 ];
+
+// The exact texture used on Dashboard's hero band — reused here so the
+// two screens are visibly the same product, not two different ones.
+const GraphPaper = ({ className = "" }) => (
+  <svg className={className} width="100%" height="100%" preserveAspectRatio="none">
+    <defs>
+      <pattern id="ledgerGridLanding" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="1" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#ledgerGridLanding)" />
+  </svg>
+);
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [mounted, setMounted] = useState(false);
   const [activeModule, setActiveModule] = useState(0);
 
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 60);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
-    <div style={{ backgroundColor: T.paper, fontFamily: "'Source Serif 4', serif" }} className="min-h-screen w-full">
+    <div style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }} className="min-h-screen w-full">
       <style>{`
-        @keyframes coverIn {
-          from { opacity: 0; transform: translateX(-18px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes pageIn {
-          from { opacity: 0; transform: translateX(18px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes rowIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .stamp-btn { transition: transform 160ms ease, box-shadow 160ms ease; }
-        .stamp-btn:hover { transform: rotate(-4deg) scale(1.04); }
-        .stamp-btn:active { transform: rotate(-2deg) scale(0.97); }
-        a:focus-visible, button:focus-visible {
-          outline: 2px solid ${T.brass};
-          outline-offset: 3px;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .anim-cover, .anim-page, .anim-row { animation: none !important; opacity: 1 !important; transform: none !important; }
-        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* hidden SVG filter: gives the ink stamp a rough, non-vector edge */}
-      <svg width="0" height="0" style={{ position: "absolute" }}>
-        <filter id="stampRough">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.5" />
-        </filter>
-      </svg>
+      {/* =============== HERO =============== */}
+      <div className="relative overflow-hidden" style={{ background: `linear-gradient(155deg, ${C.primaryDark}, ${C.primary} 60%, #3B82F6)` }}>
+        <GraphPaper className="absolute inset-0 pointer-events-none" />
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
 
-      {/* =============== HERO: the open ledger book =============== */}
-      <div className="relative w-full overflow-hidden" style={{ backgroundColor: T.coverDark }}>
-        <div className="max-w-5xl mx-auto px-4 lg:px-6">
-          {/* top wordmark, sits above the "book" like a shelf label */}
+        <div className="relative max-w-5xl mx-auto px-4 lg:px-8">
           <div className="flex items-center justify-between pt-6 pb-5">
-            <span style={{ ...display, color: T.brassLight, letterSpacing: "0.02em" }} className="text-[15px] font-semibold">
-              LedgerOS
-            </span>
-            <button
-              onClick={() => navigate("/login")}
-              style={{ ...body, color: T.brassLight }}
-              className="text-[13px] underline decoration-dotted underline-offset-4 hover:text-white"
-            >
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
+                <span className="text-blue-600 text-xs font-bold">L</span>
+              </div>
+              <span className="text-white font-semibold text-[15px]">LedgerOS</span>
+            </div>
+            <button onClick={() => navigate("/login")} className="text-[13px] font-medium text-blue-100 hover:text-white">
               Sign in
             </button>
           </div>
 
-          {/* the book itself: cover (left) + open page (right) + spine */}
-          <div className="relative grid lg:grid-cols-[1fr_auto_1.15fr] rounded-t-lg overflow-hidden shadow-2xl">
-            {/* left: cloth cover */}
-            <div
-              className={`relative px-7 py-10 lg:py-14 flex flex-col justify-center ${mounted ? "anim-cover" : "opacity-0"}`}
-              style={{
-                backgroundColor: T.cover,
-                backgroundImage: `
-                  repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 5px),
-                  repeating-linear-gradient(-45deg, rgba(0,0,0,0.03) 0 2px, transparent 2px 5px),
-                  linear-gradient(160deg, rgba(255,255,255,0.06), transparent 40%)
-                `,
-                animation: mounted ? "coverIn 620ms cubic-bezier(.2,.7,.2,1) both" : "none",
-              }}
-            >
-              <p style={{ ...mono, color: T.brassLight }} className="text-[10.5px] tracking-[0.22em] uppercase mb-4 opacity-80">
-                Trade &amp; Household Accounts
-              </p>
-              <h1 style={{ ...display, color: "#F4EFDF" }} className="text-[2.1rem] lg:text-[2.6rem] leading-[1.06] font-semibold">
-                The book that balances itself.
-              </h1>
-              <p style={{ ...body, color: "rgba(244,239,223,0.78)" }} className="mt-5 text-[15px] leading-relaxed max-w-sm">
-                Log what you bought, log what you sold. LedgerOS keeps the cost, the cash,
-                and the profit — correct, every time, without a calculator in sight.
-              </p>
-
-              <div className="mt-8 flex flex-wrap items-center gap-5">
-                <button
-                  onClick={() => navigate("/signup")}
-                  className="stamp-btn relative flex items-center justify-center"
-                  style={{
-                    width: 156, height: 156,
-                    border: `3px double ${T.brassLight}`,
-                    borderRadius: "50%",
-                    filter: "url(#stampRough)",
-                    transform: "rotate(-6deg)",
-                    background: "transparent",
-                  }}
-                >
-                  <span style={{ ...display, color: T.brassLight }} className="text-[13px] font-semibold tracking-[0.12em] uppercase leading-tight text-center px-3">
-                    Open an
-                    <br />
-                    Account
-                  </span>
-                </button>
-                <button
-                  onClick={() => navigate("/tutorial")}
-                  style={{ ...body, color: T.brassLight }}
-                  className="flex items-center gap-1.5 text-[13.5px] hover:text-white"
-                >
-                  <PlayCircle size={16} /> See a filled ledger
-                </button>
-              </div>
-            </div>
-
-            {/* spine / binding */}
-            <div
-              className="hidden lg:block relative w-6"
-              style={{
-                background: `linear-gradient(90deg, ${T.coverDark}, #0B1712 50%, ${T.coverDark})`,
-              }}
-            >
-              <div
-                className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px]"
-                style={{
-                  backgroundImage: `repeating-linear-gradient(to bottom, ${T.brass} 0 4px, transparent 4px 11px)`,
-                }}
-              />
-            </div>
-
-            {/* right: open ruled page with the worked example */}
-            <div
-              className={`relative px-6 py-8 lg:py-12 lg:px-9 ${mounted ? "anim-page" : "opacity-0"}`}
-              style={{
-                backgroundColor: T.paper,
-                backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 31px, ${T.paperLine} 31px 32px)`,
-                animation: mounted ? "pageIn 620ms 120ms cubic-bezier(.2,.7,.2,1) both" : "none",
-              }}
-            >
-              <p style={{ ...mono, color: T.red }} className="text-[10.5px] tracking-[0.18em] uppercase mb-3">
-                Ledger No. 1 — Specimen Entry
-              </p>
-
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ color: T.ink }} className="text-left">
-                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 w-[52px]">Date</th>
-                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2">Particulars</th>
-                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 text-right w-[70px]">Debit</th>
-                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 text-right w-[70px]">Credit</th>
-                    <th style={mono} className="text-[10px] uppercase tracking-wide font-medium pb-2 text-right w-[78px]">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledgerRows.map((r, i) => (
-                    <tr
-                      key={i}
-                      className={mounted ? "anim-row" : "opacity-0"}
-                      style={{ animation: mounted ? `rowIn 420ms ${260 + i * 120}ms both` : "none" }}
-                    >
-                      <td style={{ ...mono, color: T.ink }} className="text-[11.5px] py-2 align-top opacity-70">{r.date}</td>
-                      <td style={{ ...body, color: T.ink }} className="text-[12.5px] py-2 align-top pr-2">{r.particulars}</td>
-                      <td style={{ ...mono, color: T.red }} className="text-[12px] py-2 align-top text-right">{r.debit}</td>
-                      <td style={{ ...mono, color: T.cover }} className="text-[12px] py-2 align-top text-right">{r.credit}</td>
-                      <td style={{ ...mono, color: T.ink }} className="text-[12px] py-2 align-top text-right font-medium">{r.balance}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td colSpan={5} style={{ borderTop: `1px solid ${T.ink}` }} className="pt-2">
-                      <div className="flex items-baseline justify-between">
-                        <span style={{ ...body, color: T.ink }} className="text-[11.5px] italic opacity-70">
-                          * owed by customer, not yet received
-                        </span>
-                        <span style={{ ...mono, color: T.ink }} className="text-[12px] font-semibold">
-                          Gross profit&nbsp;&nbsp;₦15,000
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <div className="pt-6 pb-14 lg:pt-10 lg:pb-20 max-w-xl">
+            <h1 className="text-3xl lg:text-[2.6rem] font-semibold text-white leading-[1.1] tracking-tight">
+              The book that balances itself.
+            </h1>
+            <p className="mt-4 text-blue-100 text-[15px] leading-relaxed max-w-md">
+              Log what you bought, log what you sold. LedgerOS keeps the cost, the cash,
+              and the profit — correct, every time, without a calculator in sight.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button onClick={() => navigate("/signup")} className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3 hover:bg-blue-50">
+                Open an account <ArrowRight size={16} />
+              </button>
+              <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 border border-white/40 text-white font-semibold text-sm rounded-xl px-5 py-3 hover:bg-white/10">
+                <PlayCircle size={17} /> See a filled ledger
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* =============== MODULE INDEX (ledger tabs) =============== */}
-      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-16 lg:py-20">
-        <p style={{ ...mono, color: T.red }} className="text-[10.5px] tracking-[0.2em] uppercase mb-2">
-          Index
-        </p>
-        <h2 style={{ ...display, color: T.ink }} className="text-[1.6rem] font-semibold mb-8">
-          Five sections. One set of books.
-        </h2>
-
-        <div className="grid lg:grid-cols-[240px_1fr] gap-0 border" style={{ borderColor: "rgba(28,58,46,0.25)" }}>
-          {/* tab column */}
-          <div className="flex lg:flex-col overflow-x-auto lg:overflow-visible">
-            {modules.map((m, i) => (
-              <button
-                key={m.label}
-                onClick={() => setActiveModule(i)}
-                className="relative text-left px-4 py-3.5 shrink-0 lg:shrink border-b lg:border-b lg:last:border-b-0"
-                style={{
-                  borderColor: "rgba(28,58,46,0.18)",
-                  backgroundColor: activeModule === i ? T.paper : "transparent",
-                  borderLeft: activeModule === i ? `3px solid ${T.red}` : "3px solid transparent",
-                }}
-              >
-                <span style={{ ...mono, color: T.red }} className="text-[10px] mr-2">{m.tag}</span>
-                <span style={{ ...body, color: T.ink }} className="text-[13.5px] font-medium">{m.label}</span>
-              </button>
-            ))}
+      {/* =============== WORKED EXAMPLE — real content, standard card =============== */}
+      <div className="max-w-5xl mx-auto px-4 lg:px-8 -mt-8 lg:-mt-10 relative z-10">
+        <div className="rounded-2xl bg-white border p-5 lg:p-7" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.06), 0 12px 32px rgba(15,23,42,0.08)" }}>
+          <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-4">Ledger No. 1 — Specimen Entry</p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[480px]">
+              <thead>
+                <tr className="text-left border-b" style={{ borderColor: C.border }}>
+                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 pr-2">Date</th>
+                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2">Particulars</th>
+                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Debit</th>
+                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Credit</th>
+                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledgerRows.map((r, i) => (
+                  <tr key={i} className="border-b last:border-b-0" style={{ borderColor: "#F1F5F9" }}>
+                    <td className="text-[12px] py-2.5 pr-2 align-top text-slate-400 whitespace-nowrap">{r.date}</td>
+                    <td className="text-[13px] py-2.5 align-top text-slate-700">
+                      {r.particulars}
+                      {r.note && <span className="text-slate-400"> *</span>}
+                    </td>
+                    <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums" style={{ color: C.danger }}>{r.debit ? naira(r.debit) : ""}</td>
+                    <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums" style={{ color: C.success }}>{r.credit ? naira(r.credit) : ""}</td>
+                    <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums font-medium text-slate-900">{naira(r.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: C.border }}>
+            <span className="text-[11.5px] text-slate-400 italic">* owed by customer, not yet received</span>
+            <span className="text-[13px] font-semibold text-slate-900">Gross profit&nbsp; {naira(15000)}</span>
+          </div>
+        </div>
+      </div>
 
-          {/* open page for the active tab */}
-          <div
-            className="px-6 py-8 lg:px-10 lg:py-10"
-            style={{
-              backgroundColor: T.paper,
-              backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 30px, ${T.paperLine} 30px 31px)`,
-            }}
-          >
-            <h3 style={{ ...display, color: T.ink }} className="text-[1.3rem] font-semibold mb-3">
-              {modules[activeModule].label}
-            </h3>
-            <p style={{ ...body, color: T.ink }} className="text-[14.5px] leading-relaxed max-w-md opacity-85">
-              {modules[activeModule].body}
-            </p>
+      {/* =============== MODULE INDEX — same tab pattern used across the app =============== */}
+      <div className="max-w-5xl mx-auto px-4 lg:px-8 py-14 lg:py-20">
+        <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">Index</p>
+        <h2 className="text-xl lg:text-2xl font-semibold text-slate-900 mb-6">Five sections. One set of books.</h2>
+
+        <div className="flex gap-1 mb-5 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
+          {modules.map((m, i) => (
+            <button
+              key={m.key}
+              onClick={() => setActiveModule(i)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-lg ${
+                activeModule === i ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              <m.icon size={13} /> {m.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-2xl bg-white border p-6 lg:p-8" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+          <div className="flex items-start gap-4">
+            <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${C.primary}12` }}>
+              {(() => { const Icon = modules[activeModule].icon; return <Icon size={20} style={{ color: C.primary }} />; })()}
+            </span>
+            <div>
+              <h3 className="text-base font-semibold text-slate-900 mb-1.5">{modules[activeModule].label}</h3>
+              <p className="text-[14px] text-slate-500 leading-relaxed max-w-md">{modules[activeModule].body}</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* =============== CLOSING =============== */}
-      <div style={{ backgroundColor: T.cover }} className="w-full">
-        <div className="max-w-5xl mx-auto px-4 lg:px-6 py-16 lg:py-20 flex flex-col items-center text-center">
-          <p style={{ ...mono, color: T.brassLight }} className="text-[11px] tracking-[0.2em] uppercase mb-3 opacity-80">
-            Brought forward · Carried forward · Never lost
-          </p>
-          <h2 style={{ ...display, color: "#F4EFDF" }} className="text-[1.7rem] lg:text-[2rem] font-semibold max-w-lg leading-snug mb-8">
-            Start the ledger your business already deserves.
-          </h2>
-          <button
-            onClick={() => navigate("/signup")}
-            className="stamp-btn relative flex items-center justify-center"
-            style={{
-              width: 148, height: 148,
-              border: `3px double ${T.brassLight}`,
-              borderRadius: "50%",
-              filter: "url(#stampRough)",
-              transform: "rotate(4deg)",
-            }}
-          >
-            <span style={{ ...display, color: T.brassLight }} className="text-[12.5px] font-semibold tracking-[0.12em] uppercase leading-tight text-center px-3">
-              Open an
-              <br />
-              Account
-            </span>
-          </button>
-          <p style={{ ...body, color: "rgba(244,239,223,0.6)" }} className="text-[12px] mt-6">
-            No card required · Tutorial uses sample data only
-          </p>
+      <div className="max-w-5xl mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
+        <div className="rounded-3xl px-6 py-12 lg:py-16 flex flex-col items-center text-center relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})` }}>
+          <GraphPaper className="absolute inset-0 pointer-events-none" />
+          <div className="relative">
+            <p className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-blue-100 uppercase tracking-wide mb-3">
+              <CheckCircle2 size={13} /> Brought forward · Carried forward · Never lost
+            </p>
+            <h2 className="text-xl lg:text-2xl font-semibold text-white max-w-lg leading-snug mb-7">
+              Start the ledger your business already deserves.
+            </h2>
+            <button onClick={() => navigate("/signup")} className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3 mx-auto hover:bg-blue-50">
+              Open an account <ArrowRight size={16} />
+            </button>
+            <p className="text-[12px] text-blue-100 mt-5">No card required · Tutorial uses sample data only</p>
+          </div>
         </div>
       </div>
     </div>
