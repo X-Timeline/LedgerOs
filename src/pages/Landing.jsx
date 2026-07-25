@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowRight, PlayCircle, Package, ShoppingCart, Wallet, BarChart3,
+  PlayCircle, Package, ShoppingCart, Wallet, BarChart3,
   Users, ArrowDownRight
 } from "lucide-react";
 
@@ -89,12 +89,12 @@ export default function Landing() {
           Log what you bought, log what you sold. LedgerOS keeps the cost, the cash,
           and the profit — correct, every time, without a calculator in sight.
         </p>
-        <div className="mt-7 flex flex-wrap gap-3">
-          <button onClick={() => navigate("/signup")} className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
-            Open an account <ArrowRight size={16} />
+        <div className="mt-7 flex flex-wrap items-center gap-5">
+          <button onClick={() => navigate("/signup")} className="text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
+            Open an account
           </button>
-          <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 border text-slate-700 font-semibold text-sm rounded-xl px-5 py-3" style={{ borderColor: C.border }}>
-            <PlayCircle size={17} /> See a filled ledger
+          <button onClick={() => navigate("/tutorial")} className="flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-900">
+            <PlayCircle size={15} /> or see a filled ledger first
           </button>
         </div>
       </div>
@@ -166,13 +166,16 @@ export default function Landing() {
         <div className="flex items-center gap-2 text-slate-400 text-[12px] mb-2">
           <ArrowDownRight size={13} /> Total carried forward
         </div>
-        <h2 className="text-xl lg:text-2xl font-semibold text-slate-900 max-w-md leading-snug mb-6">
+        <h2 className="text-xl lg:text-2xl font-semibold text-slate-900 max-w-md leading-snug mb-5">
           Start the ledger your business already deserves.
         </h2>
-        <button onClick={() => navigate("/signup")} className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
-          Open an account <ArrowRight size={16} />
-        </button>
-        <p className="text-[12px] text-slate-400 mt-4 pb-16">No card required · Tutorial uses sample data only</p>
+        <div className="max-w-md pt-4 border-t flex items-center justify-between" style={{ borderColor: C.border }}>
+          <span className="text-[12px] text-slate-400">No card required · sample data in the tutorial</span>
+          <button onClick={() => navigate("/signup")} className="text-[13.5px] font-semibold underline decoration-2 underline-offset-4" style={{ color: C.primary, textDecorationColor: `${C.primary}55` }}>
+            Open an account
+          </button>
+        </div>
+        <div className="pb-16" />
       </Page>
     </div>
   );
