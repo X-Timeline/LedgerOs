@@ -15,8 +15,9 @@ function movingLabel(daysOld) {
 }
 
 export default function Reports() {
-  const { selectedShop } = useOutletContext();
-  const shopId = selectedShop?.id !== "all" ? selectedShop?.id : null;
+  const { selectedShop, businessId } = useOutletContext();
+  const isAllShops = selectedShop?.id === "all";
+  const shopId = !isAllShops ? selectedShop?.id : null;
 
   const [tab, setTab] = useState("trading");
   const [loading, setLoading] = useState(true);
@@ -28,15 +29,20 @@ export default function Reports() {
   const [capitalNet, setCapitalNet] = useState(0);
 
   const refresh = useCallback(() => {
-    if (!shopId) return;
+    if (isAllShops && !businessId) return;
+    if (!isAllShops && !shopId) return;
     setLoading(true);
     const now = new Date().toISOString();
+
+    const scopeParam = isAllShops ? `businessId=${businessId}` : `shopId=${shopId}`;
+    const prefix = isAllShops ? '/reports/business' : '/reports';
+
     Promise.all([
-      api.get(`/reports/trading-account?shopId=${shopId}&start=${EPOCH}&end=${now}`),
-      api.get(`/reports/profit-and-loss?shopId=${shopId}&start=${EPOCH}&end=${now}`),
-      api.get(`/reports/balance-sheet?shopId=${shopId}&asOf=${now}`),
-      api.get(`/reports/inventory-aging?shopId=${shopId}`),
-      api.get(`/capital?shopId=${shopId}`),
+      api.get(`${prefix}/trading-account?${scopeParam}&start=${EPOCH}&end=${now}`),
+      api.get(`${prefix}/profit-and-loss?${scopeParam}&start=${EPOCH}&end=${now}`),
+      api.get(`${prefix}/balance-sheet?${scopeParam}&asOf=${now}`),
+      api.get(`${prefix}/inventory-aging?${scopeParam}`),
+      api.get(`/capital?${scopeParam}`),
     ])
       .then(([tradingData, pnlData, bsData, agingData, capitalData]) => {
         setLoading(false);
@@ -54,16 +60,14 @@ export default function Reports() {
         setLoading(false);
         setError(err.message);
       });
-  }, [shopId]);
+  }, [shopId, isAllShops, businessId]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  if (!shopId) {
+  if (isAllShops && !businessId) {
     return (
       <div className="w-full flex items-center justify-center py-24 px-4" style={{ fontFamily: "Inter, sans-serif" }}>
-        <p className="text-sm text-slate-400 text-center max-w-xs">
-          Select a specific shop from the switcher above to view its reports — business-wide reports aren't wired yet.
-        </p>
+        <p className="text-sm text-slate-400">Loading business data…</p>
       </div>
     );
   }
