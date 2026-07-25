@@ -56,7 +56,51 @@ export default function POS() {
   const [payment, setPayment] = useState("cash"); // cash | bank | credit
   const [customerOpen, setCustomerOpen] = useState(false);
   const [customer, setCustomer] = useState(null);
+  const [discount, setDiscount] = useState("");
   const [posted, setPosted] = useState(null); // last completed sale summary
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [sales, setSales] = useState([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [saleReturnLine, setSaleReturnLine] = useState(null); // { line, saleId }
+  const [saleReturnQty, setSaleReturnQty] = useState("");
+  const [saleReturnReason, setSaleReturnReason] = useState("");
+  const [savingSaleReturn, setSavingSaleReturn] = useState(false);
+  const [returnError, setReturnError] = useState("");
+
+  const productName = (id) => products.find((p) => p.id === id)?.name || "Item";
+
+  const loadSales = useCallback(() => {
+    if (!shopId) return;
+    setSalesLoading(true);
+    api.get(`/sales?shopId=${shopId}`)
+      .then((data) => { setSales(data || []); setSalesLoading(false); })
+      .catch((err) => { setError(err.message); setSalesLoading(false); });
+  }, [shopId]);
+
+  useEffect(() => { if (showHistory) loadSales(); }, [showHistory, loadSales]);
+
+  const submitSaleReturn = async () => {
+    if (!saleReturnLine || !saleReturnQty) return;
+    setSavingSaleReturn(true);
+    setReturnError("");
+    try {
+      await api.post("/returns/sale", {
+        saleLineId: saleReturnLine.line.id,
+        quantityReturned: Number(saleReturnQty),
+        reason: saleReturnReason || undefined,
+      });
+      loadSales();
+      refresh(); // stock changed, refresh product list too
+      setSaleReturnLine(null);
+      setSaleReturnQty("");
+      setSaleReturnReason("");
+    } catch (err) {
+      setReturnError(err.message);
+    } finally {
+      setSavingSaleReturn(false);
+    }
+  };
 
   const refresh = useCallback(() => {
     if (!shopId) return;
@@ -118,8 +162,14 @@ export default function POS() {
   const removeItem = (key) => setCart((prev) => prev.filter((i) => i.key !== key));
 
   const total = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.qty, 0), [cart]);
+  const discountAmount = Number(discount) || 0;
+  const grandTotal = Math.max(0, total - discountAmount);
 
-  const canPost = cart.length > 0 && cart.every((i) => i.price > 0) && (payment !== "credit" || customer);
+  const canPost =
+    cart.length > 0 &&
+    cart.every((i) => i.price > 0) &&
+    (payment !== "credit" || customer) &&
+    discountAmount <= total;
 
   const postSale = async () => {
     setError("");
@@ -136,6 +186,7 @@ export default function POS() {
         shopId,
         customerId: payment === "credit" ? customer?.id : null,
         channel: payment.toUpperCase(),
+        discountAmount,
         lines,
       });
     } catch (err) {
@@ -145,7 +196,7 @@ export default function POS() {
 
     setPosting(false);
     setPosted({
-      total,
+      total: grandTotal,
       items: cart.length,
       payment,
       customer: payment === "credit" ? customer?.name : null,
@@ -153,6 +204,7 @@ export default function POS() {
     });
     setCart([]);
     setCustomer(null);
+    setDiscount("");
     setPayment("cash");
     setCartOpen(false);
     refresh(); // stock just changed server-side — pull the new numbers
@@ -177,8 +229,17 @@ export default function POS() {
             <h1 className="text-lg font-semibold text-slate-900">New Sale</h1>
             <p className="text-xs text-slate-400">{selectedShop.name}</p>
           </div>
-          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-white border rounded-full px-3 py-1.5" style={{ borderColor: C.border }}>
-            <User size={13} /> {user?.user_metadata?.name || user?.email}
+          <span className="flex items-center gap-2">
+            <button
+              onClick={() => setShowHistory(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-white border rounded-full px-3 py-1.5"
+              style={{ borderColor: C.border }}
+            >
+              <Clock size={13} /> History
+            </button>
+            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-white border rounded-full px-3 py-1.5" style={{ borderColor: C.border }}>
+              <User size={13} /> {user?.user_metadata?.name || user?.email}
+            </span>
           </span>
         </div>
 
@@ -374,9 +435,35 @@ export default function POS() {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Total</span>
-            <span className="text-xl font-semibold tabular-nums text-slate-900">{money(total)}</span>
+          <div>
+            <p className="text-[11px] font-medium text-slate-500 mb-1.5">Discount (₦, optional)</p>
+            <input
+              type="number"
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
+              placeholder="0"
+              className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+              style={{ borderColor: C.border }}
+            />
+          </div>
+
+          <div className="space-y-1">
+            {discountAmount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{money(total)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-red-500">
+                  <span>Discount</span>
+                  <span className="tabular-nums">-{money(discountAmount)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">Total</span>
+              <span className="text-xl font-semibold tabular-nums text-slate-900">{money(grandTotal)}</span>
+            </div>
           </div>
 
           <button
@@ -394,172 +481,4 @@ export default function POS() {
       {cartOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex items-end">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setCartOpen(false)} />
-          <div className="relative w-full bg-white rounded-t-3xl max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: C.border }}>
-              <button
-                onClick={() => setCartOpen(false)}
-                aria-label="Cancel"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
-                style={{ backgroundColor: C.danger }}
-              >
-                <X size={16} />
-              </button>
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <ShoppingCart size={16} /> Cart · {cart.length} item{cart.length === 1 ? "" : "s"}
-              </span>
-              <span className="w-8" />
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-              {cart.length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-2xl mb-1">🛒</p>
-                  <p className="text-xs text-slate-400">No items yet. Tap a product to add it.</p>
-                </div>
-              ) : (
-                cart.map((i) => (
-                  <div key={i.key} className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-slate-900 truncate">{i.name}</p>
-                      <p className="text-[11px] text-slate-400 capitalize flex items-center gap-1">
-                    {i.unit} ·
-                    <span className="text-slate-400">₦</span>
-                    <input
-                      type="number"
-                      value={i.price || ""}
-                      onChange={(e) => changePrice(i.key, e.target.value)}
-                      placeholder="price"
-                      className="w-16 border-b border-dashed outline-none bg-transparent"
-                      style={{ borderColor: C.border }}
-                    />
-                    each
-                  </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 border rounded-lg" style={{ borderColor: C.border }}>
-                      <button onClick={() => changeQty(i.key, -1)} className="p-1.5 hover:bg-slate-50 rounded-l-lg">
-                        <Minus size={12} />
-                      </button>
-                      <span className="text-xs font-medium w-5 text-center tabular-nums">{i.qty}</span>
-                      <button onClick={() => changeQty(i.key, 1)} disabled={i.qty >= i.maxQty} className="p-1.5 hover:bg-slate-50 rounded-r-lg disabled:opacity-30">
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                    <button onClick={() => removeItem(i.key)} className="p-1.5 text-slate-300 hover:text-red-500">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="px-5 py-4 border-t space-y-4" style={{ borderColor: C.border }}>
-              <div>
-                <p className="text-[11px] font-medium text-slate-500 mb-2">Payment method</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { key: "cash", label: "Cash", icon: Banknote },
-                    { key: "bank", label: "Transfer", icon: Landmark },
-                    { key: "credit", label: "Credit", icon: Clock },
-                  ].map((m) => (
-                    <button
-                      key={m.key}
-                      onClick={() => setPayment(m.key)}
-                      className={`flex flex-col items-center gap-1 rounded-xl border py-2.5 text-[11px] font-medium ${
-                        payment === m.key ? "border-blue-500 bg-blue-50 text-blue-600" : "text-slate-500"
-                      }`}
-                      style={{ borderColor: payment === m.key ? C.primary : C.border }}
-                    >
-                      <m.icon size={15} />
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {payment === "credit" && (
-                <div className="relative">
-                  <button
-                    onClick={() => setCustomerOpen((v) => !v)}
-                    className="w-full flex items-center justify-between rounded-xl border px-3 py-2.5 text-[13px]"
-                    style={{ borderColor: C.border }}
-                  >
-                    <span className={customer ? "text-slate-900 font-medium" : "text-slate-400"}>
-                      {customer ? customer.name : "Select customer"}
-                    </span>
-                    <ChevronDown size={15} className="text-slate-400" />
-                  </button>
-                  {customerOpen && (
-                    <div className="absolute bottom-full mb-1 w-full bg-white border rounded-xl shadow-lg overflow-hidden z-10" style={{ borderColor: C.border }}>
-                      {customers.map((c) => (
-                        <button
-                          key={c.id}
-                          onClick={() => { setCustomer(c); setCustomerOpen(false); }}
-                          className="w-full flex items-center justify-between px-3 py-2.5 text-[13px] hover:bg-slate-50"
-                        >
-                          <span>{c.name}</span>
-                          {customer?.id === c.id && <Check size={14} style={{ color: C.primary }} />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-[11px] text-amber-600 mt-1.5">Stock leaves now; sale stays pending until paid.</p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">Total</span>
-                <span className="text-xl font-semibold tabular-nums text-slate-900">{money(total)}</span>
-              </div>
-
-              <button
-                onClick={postSale}
-                disabled={!canPost || posting}
-                className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
-                style={{ backgroundColor: C.primary }}
-              >
-                {posting ? "Posting…" : "Complete Sale"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ---------- Floating reopen affordance (mobile, cart has items but modal closed) ---------- */}
-      {!cartOpen && cart.length > 0 && (
-        <button
-          onClick={() => setCartOpen(true)}
-          className="lg:hidden fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full pl-4 pr-5 py-3 text-white text-sm font-semibold shadow-lg"
-          style={{ backgroundColor: C.primary }}
-        >
-          <ShoppingCart size={16} />
-          {cart.length} · {money(total)}
-        </button>
-      )}
-
-      {/* ---------- Success confirmation ---------- */}
-      {posted && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setPosted(null)} />
-          <div className="relative w-full max-w-sm bg-white rounded-3xl p-6 text-center">
-            <div className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-4" style={{ backgroundColor: `${C.success}18` }}>
-              <Check size={26} style={{ color: C.success }} />
-            </div>
-            <h3 className="text-base font-semibold text-slate-900">Sale recorded</h3>
-            <p className="text-2xl font-semibold tabular-nums mt-2 text-slate-900">{money(posted.total)}</p>
-            <p className="text-xs text-slate-400 mt-1">
-              {posted.items} item{posted.items === 1 ? "" : "s"} · {posted.payment === "credit" ? `Credit — ${posted.customer}` : posted.payment === "bank" ? "Transfer" : "Cash"}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">Posted by {posted.postedBy}</p>
-            <button
-              onClick={() => setPosted(null)}
-              className="w-full mt-5 rounded-xl py-2.5 text-sm font-semibold text-white"
-              style={{ backgroundColor: C.primary }}
-            >
-              New Sale
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  
