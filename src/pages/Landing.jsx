@@ -13,14 +13,14 @@ import { PlayCircle } from "lucide-react";
 // ---------------------------------------------------------------
 
 const T = {
-  cover: "#1C3A2E",      // ledger cloth cover, deep bottle green
-  coverDark: "#122720",  // shadow/spine side of the cover
-  paper: "#F1E9D2",      // aged ledger page
-  paperLine: "rgba(28,58,46,0.13)", // ruled line on the page
-  ink: "#211D16",        // main text ink
-  red: "#7C2A28",        // ledger red ink (debit/stamp)
-  brass: "#B08A46",      // brass/gilt accent
-  brassLight: "#D9C08B",
+  cover: "#132A54",      // ledger cover, deep navy — same family as the app's primary blue
+  coverDark: "#0A1730",  // shadow/spine side of the cover
+  paper: "#F8F6F1",      // soft, barely-warm page — reads as "paper" without clashing with app white
+  paperLine: "rgba(19,42,84,0.10)", // ruled line on the page, blue-tinted to match
+  ink: "#0F172A",        // matches the app's C.dark exactly, ties typography straight to the rest of the app
+  red: "#B42318",        // ledger red ink (debit)
+  brass: "#2563EB",      // was a brass/gilt accent — now the app's actual primary blue
+  brassLight: "#93C5FD", // light blue for text on dark backgrounds (tailwind blue-300)
 };
 
 const display = { fontFamily: "'Fraunces', serif" };
