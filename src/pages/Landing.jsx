@@ -1,27 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight, PlayCircle, Package, ShoppingCart, Wallet, BarChart3,
-  Users, CheckCircle2
+  Users, ArrowDownRight
 } from "lucide-react";
 
-// Design direction: same materials as the rest of the app (Inter, light
-// background, rounded-2xl white cards, blue primary, the graph-paper
-// texture already used on Dashboard's hero) — but the content stays
-// product-specific rather than generic: a real worked ledger example
-// instead of marketing copy, and the actual five modules instead of
-// abstract "features."
+// Structural note: dropped the gradient-hero -> floating-card ->
+// pill-tabs -> gradient-CTA sandwich (that skeleton is what actually
+// read as templated, independent of color). This is one continuous
+// ruled page instead — a red margin rule and folio numbers carry the
+// "ledger" idea through the whole layout, not just one card.
 
 const C = {
   primary: "#2563EB",
   primaryDark: "#1D4ED8",
   success: "#22C55E",
-  warning: "#F59E0B",
   danger: "#EF4444",
   bg: "#F8FAFC",
   border: "#E2E8F0",
   dark: "#0F172A",
   textSub: "#64748B",
+  margin: "#DC5A50", // ledger margin-rule red
 };
 
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
@@ -41,18 +40,23 @@ const modules = [
   { key: "reports", icon: BarChart3, label: "Reports", body: "Trading account, profit & loss, balance sheet — read live from your books, never a stale export." },
 ];
 
-// The exact texture used on Dashboard's hero band — reused here so the
-// two screens are visibly the same product, not two different ones.
-const GraphPaper = ({ className = "" }) => (
-  <svg className={className} width="100%" height="100%" preserveAspectRatio="none">
-    <defs>
-      <pattern id="ledgerGridLanding" width="24" height="24" patternUnits="userSpaceOnUse">
-        <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="1" />
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#ledgerGridLanding)" />
-  </svg>
-);
+// Ledger-margin page: a thin red rule near the left edge, running the
+// full height of whatever it wraps, with a folio number top-right.
+function Page({ folio, children }) {
+  return (
+    <div className="relative max-w-3xl mx-auto px-6 lg:px-0">
+      <div className="absolute top-0 bottom-0 hidden sm:block" style={{ left: "3.25rem", width: 1, backgroundColor: C.margin, opacity: 0.35 }} />
+      <div className="flex items-center justify-between pt-10 pb-1 sm:pl-24">
+        <span className="text-[10px] font-semibold tracking-[0.2em] text-slate-300 uppercase">Folio {folio}</span>
+      </div>
+      <div className="sm:pl-24">{children}</div>
+    </div>
+  );
+}
+
+function RuledDivider() {
+  return <div className="h-px w-full mt-8 mb-8" style={{ backgroundColor: C.border }} />;
+}
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -60,91 +64,81 @@ export default function Landing() {
 
   return (
     <div style={{ backgroundColor: C.bg, fontFamily: "Inter, sans-serif" }} className="min-h-screen w-full">
-      <style>{`
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
-
-      {/* =============== HERO =============== */}
-      <div className="relative overflow-hidden" style={{ background: `linear-gradient(155deg, ${C.primaryDark}, ${C.primary} 60%, #3B82F6)` }}>
-        <GraphPaper className="absolute inset-0 pointer-events-none" />
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.14), transparent 70%)" }} />
-
-        <div className="relative max-w-5xl mx-auto px-4 lg:px-8">
-          <div className="flex items-center justify-between pt-6 pb-5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center">
-                <span className="text-blue-600 text-xs font-bold">L</span>
-              </div>
-              <span className="text-white font-semibold text-[15px]">LedgerOS</span>
+      {/* =============== HEADER =============== */}
+      <div className="border-b" style={{ borderColor: C.border }}>
+        <div className="max-w-3xl mx-auto px-6 lg:px-0 flex items-center justify-between py-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: C.primary }}>
+              <span className="text-white text-[10px] font-bold">L</span>
             </div>
-            <button onClick={() => navigate("/login")} className="text-[13px] font-medium text-blue-100 hover:text-white">
-              Sign in
-            </button>
+            <span className="font-semibold text-[14px] text-slate-900">LedgerOS</span>
           </div>
-
-          <div className="pt-6 pb-14 lg:pt-10 lg:pb-20 max-w-xl">
-            <h1 className="text-3xl lg:text-[2.6rem] font-semibold text-white leading-[1.1] tracking-tight">
-              The book that balances itself.
-            </h1>
-            <p className="mt-4 text-blue-100 text-[15px] leading-relaxed max-w-md">
-              Log what you bought, log what you sold. LedgerOS keeps the cost, the cash,
-              and the profit — correct, every time, without a calculator in sight.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button onClick={() => navigate("/signup")} className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3 hover:bg-blue-50">
-                Open an account <ArrowRight size={16} />
-              </button>
-              <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 border border-white/40 text-white font-semibold text-sm rounded-xl px-5 py-3 hover:bg-white/10">
-                <PlayCircle size={17} /> See a filled ledger
-              </button>
-            </div>
-          </div>
+          <button onClick={() => navigate("/login")} className="text-[13px] font-medium text-slate-500 hover:text-slate-900">
+            Sign in
+          </button>
         </div>
       </div>
 
-      {/* =============== WORKED EXAMPLE — real content, standard card =============== */}
-      <div className="max-w-5xl mx-auto px-4 lg:px-8 -mt-8 lg:-mt-10 relative z-10">
-        <div className="rounded-2xl bg-white border p-5 lg:p-7" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.06), 0 12px 32px rgba(15,23,42,0.08)" }}>
-          <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-4">Ledger No. 1 — Specimen Entry</p>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[480px]">
-              <thead>
-                <tr className="text-left border-b" style={{ borderColor: C.border }}>
-                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 pr-2">Date</th>
-                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2">Particulars</th>
-                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Debit</th>
-                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Credit</th>
-                  <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Balance</th>
+      {/* =============== HERO — one gradient moment, tight, tied to Dashboard's identity =============== */}
+      <div className="max-w-3xl mx-auto px-6 lg:px-0 pt-12 pb-10 sm:pl-[calc(1.5rem+6rem)]">
+        <p className="text-[11px] font-semibold tracking-[0.2em] uppercase mb-3" style={{ color: C.primary }}>LedgerOS</p>
+        <h1 className="text-3xl lg:text-[2.5rem] font-semibold text-slate-900 leading-[1.1] tracking-tight max-w-lg">
+          The book that balances itself.
+        </h1>
+        <p className="mt-4 text-slate-500 text-[15px] leading-relaxed max-w-md">
+          Log what you bought, log what you sold. LedgerOS keeps the cost, the cash,
+          and the profit — correct, every time, without a calculator in sight.
+        </p>
+        <div className="mt-7 flex flex-wrap gap-3">
+          <button onClick={() => navigate("/signup")} className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
+            Open an account <ArrowRight size={16} />
+          </button>
+          <button onClick={() => navigate("/tutorial")} className="flex items-center gap-2 border text-slate-700 font-semibold text-sm rounded-xl px-5 py-3" style={{ borderColor: C.border }}>
+            <PlayCircle size={17} /> See a filled ledger
+          </button>
+        </div>
+      </div>
+
+      {/* =============== FOLIO I — the worked entry, in normal page flow =============== */}
+      <Page folio="I">
+        <p className="text-[11px] font-semibold uppercase tracking-wide mb-4" style={{ color: C.primary }}>Specimen entry</p>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[420px]">
+            <thead>
+              <tr className="text-left border-b" style={{ borderColor: C.border }}>
+                <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 pr-2">Date</th>
+                <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2">Particulars</th>
+                <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Debit</th>
+                <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Credit</th>
+                <th className="text-[11px] uppercase tracking-wide font-medium text-slate-400 pb-2 text-right pl-2">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledgerRows.map((r, i) => (
+                <tr key={i} className="border-b last:border-b-0" style={{ borderColor: "#F1F5F9" }}>
+                  <td className="text-[12px] py-2.5 pr-2 align-top text-slate-400 whitespace-nowrap">{r.date}</td>
+                  <td className="text-[13px] py-2.5 align-top text-slate-700">
+                    {r.particulars}
+                    {r.note && <span className="text-slate-400"> *</span>}
+                  </td>
+                  <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums" style={{ color: C.danger }}>{r.debit ? naira(r.debit) : ""}</td>
+                  <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums" style={{ color: C.success }}>{r.credit ? naira(r.credit) : ""}</td>
+                  <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums font-medium text-slate-900">{naira(r.balance)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {ledgerRows.map((r, i) => (
-                  <tr key={i} className="border-b last:border-b-0" style={{ borderColor: "#F1F5F9" }}>
-                    <td className="text-[12px] py-2.5 pr-2 align-top text-slate-400 whitespace-nowrap">{r.date}</td>
-                    <td className="text-[13px] py-2.5 align-top text-slate-700">
-                      {r.particulars}
-                      {r.note && <span className="text-slate-400"> *</span>}
-                    </td>
-                    <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums" style={{ color: C.danger }}>{r.debit ? naira(r.debit) : ""}</td>
-                    <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums" style={{ color: C.success }}>{r.credit ? naira(r.credit) : ""}</td>
-                    <td className="text-[12.5px] py-2.5 pl-2 align-top text-right tabular-nums font-medium text-slate-900">{naira(r.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: C.border }}>
-            <span className="text-[11.5px] text-slate-400 italic">* owed by customer, not yet received</span>
-            <span className="text-[13px] font-semibold text-slate-900">Gross profit&nbsp; {naira(15000)}</span>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
+        <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: C.border }}>
+          <span className="text-[11.5px] text-slate-400 italic">* owed by customer, not yet received</span>
+          <span className="text-[13px] font-semibold text-slate-900">Gross profit&nbsp; {naira(15000)}</span>
+        </div>
+        <RuledDivider />
+      </Page>
 
-      {/* =============== MODULE INDEX — same tab pattern used across the app =============== */}
-      <div className="max-w-5xl mx-auto px-4 lg:px-8 py-14 lg:py-20">
-        <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">Index</p>
-        <h2 className="text-xl lg:text-2xl font-semibold text-slate-900 mb-6">Five sections. One set of books.</h2>
-
+      {/* =============== FOLIO II — index of modules =============== */}
+      <Page folio="II">
+        <h2 className="text-xl font-semibold text-slate-900 mb-5">Five sections. One set of books.</h2>
         <div className="flex gap-1 mb-5 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
           {modules.map((m, i) => (
             <button
@@ -158,38 +152,28 @@ export default function Landing() {
             </button>
           ))}
         </div>
-
-        <div className="rounded-2xl bg-white border p-6 lg:p-8" style={{ borderColor: C.border, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
-          <div className="flex items-start gap-4">
-            <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${C.primary}12` }}>
-              {(() => { const Icon = modules[activeModule].icon; return <Icon size={20} style={{ color: C.primary }} />; })()}
-            </span>
-            <div>
-              <h3 className="text-base font-semibold text-slate-900 mb-1.5">{modules[activeModule].label}</h3>
-              <p className="text-[14px] text-slate-500 leading-relaxed max-w-md">{modules[activeModule].body}</p>
-            </div>
-          </div>
+        <div className="flex items-start gap-3.5 py-2">
+          <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${C.primary}12` }}>
+            {(() => { const Icon = modules[activeModule].icon; return <Icon size={17} style={{ color: C.primary }} />; })()}
+          </span>
+          <p className="text-[14px] text-slate-500 leading-relaxed max-w-md pt-1.5">{modules[activeModule].body}</p>
         </div>
-      </div>
+        <RuledDivider />
+      </Page>
 
-      {/* =============== CLOSING =============== */}
-      <div className="max-w-5xl mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
-        <div className="rounded-3xl px-6 py-12 lg:py-16 flex flex-col items-center text-center relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})` }}>
-          <GraphPaper className="absolute inset-0 pointer-events-none" />
-          <div className="relative">
-            <p className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-blue-100 uppercase tracking-wide mb-3">
-              <CheckCircle2 size={13} /> Brought forward · Carried forward · Never lost
-            </p>
-            <h2 className="text-xl lg:text-2xl font-semibold text-white max-w-lg leading-snug mb-7">
-              Start the ledger your business already deserves.
-            </h2>
-            <button onClick={() => navigate("/signup")} className="flex items-center gap-2 bg-white text-blue-600 font-semibold text-sm rounded-xl px-5 py-3 mx-auto hover:bg-blue-50">
-              Open an account <ArrowRight size={16} />
-            </button>
-            <p className="text-[12px] text-blue-100 mt-5">No card required · Tutorial uses sample data only</p>
-          </div>
+      {/* =============== FOLIO III — closing line, not a marketing footer =============== */}
+      <Page folio="III">
+        <div className="flex items-center gap-2 text-slate-400 text-[12px] mb-2">
+          <ArrowDownRight size={13} /> Total carried forward
         </div>
-      </div>
+        <h2 className="text-xl lg:text-2xl font-semibold text-slate-900 max-w-md leading-snug mb-6">
+          Start the ledger your business already deserves.
+        </h2>
+        <button onClick={() => navigate("/signup")} className="flex items-center gap-2 text-white font-semibold text-sm rounded-xl px-5 py-3" style={{ backgroundColor: C.primary }}>
+          Open an account <ArrowRight size={16} />
+        </button>
+        <p className="text-[12px] text-slate-400 mt-4 pb-16">No card required · Tutorial uses sample data only</p>
+      </Page>
     </div>
   );
 }
