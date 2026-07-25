@@ -71,6 +71,17 @@ router.get('/inventory-aging', requireAuth, async (req, res) => {
   res.json(data);
 });
 
+// GET /reports/business/inventory-aging?businessId=
+router.get('/business/inventory-aging', requireAuth, async (req, res) => {
+  const { businessId } = req.query;
+  if (!businessId) return res.status(400).json({ error: 'businessId query param is required' });
+
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db.rpc('get_business_inventory_aging', { p_business_id: businessId });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
 // GET /reports/business/cash-book?businessId=&start=&end=
 router.get('/business/cash-book', requireAuth, async (req, res) => {
   const { businessId } = req.query;
