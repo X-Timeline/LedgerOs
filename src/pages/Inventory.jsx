@@ -473,28 +473,33 @@ export default function Inventory() {
                 </div>
                 <div className="space-y-2">
                   {newProduct.sellUnits.map((u, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        value={u.name}
-                        onChange={(e) => updateSellUnit(i, "name", e.target.value)}
-                        placeholder="packet"
-                        className="flex-1 rounded-xl border px-3 py-2 text-[13px] outline-none"
-                        style={{ borderColor: C.border }}
-                      />
-                      <span className="text-[11px] text-slate-400 shrink-0">per 1 {newProduct.baseUnit || "unit"} =</span>
-                      <input
-                        type="number"
-                        value={u.factor}
-                        onChange={(e) => updateSellUnit(i, "factor", e.target.value)}
-                        placeholder="20"
-                        className="w-16 rounded-xl border px-3 py-2 text-[13px] outline-none"
-                        style={{ borderColor: C.border }}
-                      />
-                      {newProduct.sellUnits.length > 1 && (
-                        <button onClick={() => removeSellUnit(i)} className="text-slate-300 hover:text-red-500 shrink-0">
-                          <X size={14} />
-                        </button>
-                      )}
+                    <div key={i} className="rounded-xl border p-3" style={{ borderColor: C.border }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          value={u.name}
+                          onChange={(e) => updateSellUnit(i, "name", e.target.value)}
+                          placeholder="packet"
+                          className="flex-1 min-w-0 rounded-lg border px-3 py-2 text-[13px] outline-none"
+                          style={{ borderColor: C.border }}
+                        />
+                        {newProduct.sellUnits.length > 1 && (
+                          <button onClick={() => removeSellUnit(i)} className="text-slate-300 hover:text-red-500 shrink-0 p-1">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] text-slate-400 whitespace-nowrap">per 1 {newProduct.baseUnit || "unit"} =</span>
+                        <input
+                          type="number"
+                          value={u.factor}
+                          onChange={(e) => updateSellUnit(i, "factor", e.target.value)}
+                          placeholder="20"
+                          className="w-20 min-w-0 rounded-lg border px-3 py-2 text-[13px] outline-none"
+                          style={{ borderColor: C.border }}
+                        />
+                        <span className="text-[11px] text-slate-400 truncate">{u.name || "unit"}{u.factor && u.factor !== "1" ? "s" : ""}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
